@@ -2,10 +2,13 @@
 #include <stdio.h>		/* standard I/O routines */
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <pthread.h>	/* pthread functions and data structure */
+#include <sys/socket.h>
+#include <arpa/inet.h>	/* inet_addr */
 
 /* number of threads used to service requests */
-#define NUM_HANDLER_THREADS 10
+#define NUM_HANDLER_THREADS 3
 
 /* function prototype */
 void add_request(int request_num, 
@@ -36,20 +39,61 @@ struct request* last_request = NULL;	/* pointer to the last request 	   */
  * main function 
  */
 int main(int argc, char** argv) {
+
+	int socket_desc, client_sock, c, *new_sock;
+	struct sockaddr_in server, client;
+
 	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs 		   */
 	pthread_t p_threads[NUM_HANDLER_THREADS];	/* thread's structures */
 	struct timespec delay; 
 
+	/* create socket */
+	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (socket_desc == -1) {
+		puts("Could not create socket");
+	}
+	puts("Socket created");
+
+	/* configuring end point */
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons(8888);
+
+	/* bind */
+	if (bind(socket_desc, (struct sockaddr *)&server,
+		sizeof(server)) < 0) {
+		perror("bind");
+		return 1;
+	}
+	puts("Bind done");
+
+	/* listen */
+	listen(socket_desc, 3);
+
+	/* create threads */
 	for (int i = 0; i < NUM_HANDLER_THREADS; i++) {
 		thr_id[i] = i;
-		pthread_create(&p_threads[i], NULL, handle_requests_loop, (void*)&thr_id[i]);
+		pthread_create(&p_threads[i], NULL, 
+			handle_requests_loop, (void*)&thr_id[i]);
 	}
 
-    for (int i = 0; i < 500; i++) {
-        add_request(i, &request_mutex, &got_request);
-    }
+	/* Accept an incomming connection */
+	puts("Waiting for incomming connection...");
+	c = sizeof(struct sockaddr_in);
 
-	sleep(5);
+	/* accept connection from an incomming client */
+	while (client_sock = accept(socket_desc,
+		(struct sockaddr *)&client, (socklen_t*)&c)) {
+		puts("Connection accepted");
+
+		add_request(1, &request_mutex, &got_request);
+	}
+
+	if (client_sock < 0) {
+		perror("accept");
+		return 1;
+	}
 
 	return 0;
 }
@@ -143,8 +187,8 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  */
 void handle_request(struct request* a_request, int thread_id) {
     if (a_request) {
-      	printf("Thread '%d' handled request '%d'\n",
-            	thread_id, a_request->number);
+      	printf("Thread '%d' handled request '%d'\nCurrent number of requests: %d\n",
+            	thread_id, a_request->number, num_requests);
       	fflush(stdout);
     }
 }
@@ -163,13 +207,11 @@ void* handle_requests_loop(void* data) {
     struct request* a_request;      /* pointer to a request 			 */
     int thread_id = *((int*)data);  /* thread identifying number 	   	 */
 
-
     /* lock the mutex, to access the requests list exclusively */
     rc = pthread_mutex_lock(&request_mutex);
 
     /* do forever */
     while (1) {
-
         if (num_requests > 0) { /* a request is pending */
             a_request = get_request(&request_mutex);
             if (a_request) { /* got a request - handle it and free it */
@@ -181,8 +223,7 @@ void* handle_requests_loop(void* data) {
                 /* and lock the mutex again */
                 rc = pthread_mutex_lock(&request_mutex);
             }
-        }
-        else {
+        } else {
             /* wait for a request to arrive. the mutex will be 		*/
             /* unlocked here, thus allowing other threads access to */
             /* requests list.                                       */
