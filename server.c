@@ -11,7 +11,7 @@
 #define NUM_HANDLER_THREADS 3
 
 /* function prototype */
-void add_request(int request_num, 
+void add_request(int client_socket, 
 			pthread_mutex_t* p_mutex, 
 			pthread_cond_t*  p_cond_var);
 struct request* get_request(pthread_mutex_t* p_mutex);
@@ -28,7 +28,7 @@ int num_requests = 0; /* number of pending request, initially none */
 
 /* structure of a single request */
 struct request {
-	int number;					/* request number 		   */
+	int socket;					/* socket descriptor 	   */
 	struct request* next;		/* pointer to next request */
 };
 
@@ -40,12 +40,12 @@ struct request* last_request = NULL;	/* pointer to the last request 	   */
  */
 int main(int argc, char** argv) {
 
-	int socket_desc, client_sock, c, *new_sock;
+	int socket_desc, client_sock, c;
 	struct sockaddr_in server, client;
 
 	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs 		   */
 	pthread_t p_threads[NUM_HANDLER_THREADS];	/* thread's structures */
-	struct timespec delay; 
+	struct timespec delay;
 
 	/* create socket */
 	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
 		(struct sockaddr *)&client, (socklen_t*)&c)) {
 		puts("Connection accepted");
 
-		add_request(1, &request_mutex, &got_request);
+		add_request(client_sock, &request_mutex, &got_request);
 	}
 
 	if (client_sock < 0) {
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
  * input:     request number, linked list mutex.
  * output:    none.
  */
-void add_request(int request_num,
+void add_request(int client_socket,
             pthread_mutex_t* p_mutex,
             pthread_cond_t*  p_cond_var) {
   	int rc;                         /* return code of pthreads functions */
@@ -117,7 +117,7 @@ void add_request(int request_num,
      	fprintf(stderr, "add_request: out of memory\n");
       	exit(1);
   	}
- 	a_request->number = request_num;
+ 	a_request->socket = client_socket;
   	a_request->next = NULL;
 
   	/* lock the mutex, to assure exclusive access to the list */
@@ -186,9 +186,13 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  * output:    none.
  */
 void handle_request(struct request* a_request, int thread_id) {
+	char* message = "Greeting from server\n";
+
+	write(a_request->socket, message, strlen(message));
+
     if (a_request) {
-      	printf("Thread '%d' handled request '%d'\nCurrent number of requests: %d\n",
-            	thread_id, a_request->number, num_requests);
+      	printf("Thread '%d' handled request of socket '%d'\nCurrent number of requests: %d\n",
+            	thread_id, a_request->socket, num_requests);
       	fflush(stdout);
     }
 }

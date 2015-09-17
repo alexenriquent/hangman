@@ -8,6 +8,7 @@ int main(int argc, char** argv) {
 
 	int socket_desc;
 	struct sockaddr_in server;
+	char server_message[2000];
 
 	/* craete socket */
 	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -31,7 +32,11 @@ int main(int argc, char** argv) {
 	puts("Connected\n");
 
 	while (1) {
-		
+		if (recv(socket_desc, server_message, 2000, 0) < 0) {
+			puts("reve failed");
+			break;
+		}
+		puts(server_message);
 	}
 
 	// close(socket_desc);
