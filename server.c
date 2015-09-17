@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>	/* inet_addr */
 
+/* default port */
+#define DEFAULT_PORT 12345
 /* number of threads used to service requests */
 #define NUM_HANDLER_THREADS 3
 
@@ -51,20 +53,32 @@ int main(int argc, char** argv) {
 	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (socket_desc == -1) {
-		puts("Could not create socket");
+		perror("socket");
+		exit(1);
 	}
 	puts("Socket created");
 
 	/* configuring end point */
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons(8888);
+
+	/* Check command line arguments */
+	if (argc == 2) {
+		server.sin_port = htons(atoi(argv[1]));
+		printf("Listening on port %d\n", atoi(argv[1]));
+	} else if (argc == 1) {
+		server.sin_port = htons(DEFAULT_PORT);
+		printf("Listening on port 12345\n");
+	} else {
+		fprintf(stderr, "usage: port number\n");
+		exit(1);
+	}
 
 	/* bind */
 	if (bind(socket_desc, (struct sockaddr *)&server,
 		sizeof(server)) < 0) {
 		perror("bind");
-		return 1;
+		exit(1);
 	}
 	puts("Bind done");
 
@@ -78,7 +92,7 @@ int main(int argc, char** argv) {
 			handle_requests_loop, (void*)&thr_id[i]);
 	}
 
-	/* Accept an incomming connection */
+	/* accept an incomming connection */
 	puts("Waiting for incomming connection...");
 	c = sizeof(struct sockaddr_in);
 
@@ -92,7 +106,7 @@ int main(int argc, char** argv) {
 
 	if (client_sock < 0) {
 		perror("accept");
-		return 1;
+		exit(1);
 	}
 
 	return 0;
@@ -191,7 +205,8 @@ void handle_request(struct request* a_request, int thread_id) {
 	write(a_request->socket, message, strlen(message));
 
     if (a_request) {
-      	printf("Thread '%d' handled request of socket '%d'\nCurrent number of requests: %d\n",
+      	printf("Thread '%d' handled request of socket '%d'\n
+      			Current number of requests: %d\n",
             	thread_id, a_request->socket, num_requests);
       	fflush(stdout);
     }
