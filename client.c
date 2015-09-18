@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
 
 		if (logon(socket_desc)) {
 			system("clear");
+			welcome_message();
 			option = menu();
 		} else {
 			printf("\nYou entered either an incorrect username or password - disconnecting\n");

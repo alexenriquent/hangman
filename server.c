@@ -14,7 +14,8 @@
 #define NUM_HANDLER_THREADS 10	/* number of threads */
 #define MAX_NUM_WORDS 2048		/* maximum number of words */
 #define MAX_WORD_LENGTH 256		/* maximum word length */
-#define AUTH_WORD_LENGTH 16		/* maximum word length for authentication */
+#define USERNAME_LENGTH 16		/* maximum word length for username */
+#define PASSWORD_LENGTH 16		/* maximum word length for password */
 #define NUM_USERS 10			/* number of users */
 
 /* structure of a single request */
@@ -25,8 +26,8 @@ struct request {
 
 /* structure of a user */
 struct user {
-	char username[AUTH_WORD_LENGTH]; 	/* username */
-	char password[AUTH_WORD_LENGTH];	/* password */
+	char username[USERNAME_LENGTH]; 	/* username */
+	char password[PASSWORD_LENGTH];		/* password */
 };
 
 /* structure of data read from file */
@@ -295,8 +296,12 @@ struct data read_file(char* filename) {
     char line[MAX_WORD_LENGTH];
     
     while (fgets(line, sizeof(line), file)) {
+    	char* pc;
+        while (pc = strpbrk(line, "\n\r")) {
+            *pc = 0;
+        }
     	if (line_index != 0) {
-    		strcpy(lines.words[line_index], line);
+    		strcpy(lines.words[line_index - 1], line);
     	}
         line_index++;
     }
@@ -306,7 +311,7 @@ struct data read_file(char* filename) {
 }
 
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
-	for (int i = 0; i <= NUM_USERS; i++) {
+	for (int i = 0; i < NUM_USERS; i++) {
     	int separater = 0;
     	char* token = strtok(word_list[i], " \t");
     	while(token != NULL) {
@@ -322,25 +327,28 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
 }
 
 void authenticate(int client_socket) {
-	char message[2000];
+	char username[2000];
+	char password[2000];
 	int response;
 	bool valid;
+	char credential[PASSWORD_LENGTH];
 	tokenise_auth(read_file("Authentication.txt").words);
 
-	for (int i = 1; i <= 10; i++) {
+	for (int i = 0; i < NUM_USERS; i++) {
     	printf("username %d: %s\t", i, users[i].username);
-    	printf("password %d: %s", i, users[i].password);
+    	printf("password %d: %s\n", i, users[i].password);
     }
 
 	while (1) {
-		if (recv(client_socket, message, 2000, 0) < 0) {
+		if (recv(client_socket, username, 2000, 0) < 0) {
 			puts("recv failed");
 			break;
 		}
-		printf("%s\n", message);
+		printf("%s\n", username);
 		for (int i = 0; i < NUM_USERS; i++) {
-			if (strcmp(message, users[i].username) == 0) {
+			if (strcmp(username, users[i].username) == 0) {
 				valid = true;
+				strcpy(credential, users[i].password);
 				break;
 			} else {
 				valid = false;
@@ -358,17 +366,15 @@ void authenticate(int client_socket) {
 	}
 
 	while (1) {
-		if (recv(client_socket, message, 2000, 0) < 0) {
+		if (recv(client_socket, password, 2000, 0) < 0) {
 			puts("recv failed");
 			break;
 		}
-		for (int i = 0; i < NUM_USERS; i++) {
-			if (strcmp(message, users[i].password) == 0) {
-				valid = true;
-				break;
-			} else {
-				valid = false;
-			}
+		printf("%s\n", password);
+		if (strcmp(password, credential) == 0) {
+			valid = true;
+		} else {
+			valid = false;
 		}
 		if (valid) {
 			response = 1;
