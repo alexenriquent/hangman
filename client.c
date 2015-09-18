@@ -52,18 +52,27 @@ int main(int argc, char** argv) {
 	puts("Connected\n");
 
 	/* keep communicating with server */
-	do {
-		welcome_message();
+	welcome_message();
 
-		if (logon(socket_desc)) {
+	if (logon(socket_desc)) {
+		do {
 			system("clear");
 			welcome_message();
 			option = menu();
-		} else {
-			printf("\nYou entered either an incorrect username or password - disconnecting\n");
-			break;
-		}
-	} while (option != 3);
+
+			switch(option) {
+				case 1:
+					printf("Option 1");
+					break;
+				case 2:
+					printf("Option 2");
+					break;
+			}
+
+		} while (option != 3);
+	} else {
+		printf("\nYou entered either an incorrect username or password - disconnecting\n");
+	}
 
 	close(socket_desc);
 
