@@ -1,24 +1,27 @@
 #define _GNU_SOURCE
 #include <stdio.h>		/* standard I/O routines */
 #include <stdlib.h>
+#include <stdbool.h>	/* boolean */
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>	/* pthread functions and data structure */
-#include <sys/socket.h>
+#include <sys/socket.h>	/* BSD socket */
 #include <arpa/inet.h>	/* inet_addr */
+#include <signal.h>
+#include <errno.h>
 
-/* default port */
-#define DEFAULT_PORT 12345
-/* number of threads used to service requests */
-#define NUM_HANDLER_THREADS 3
+#define DEFAULT_PORT 12345		/* default port 	 */
+#define NUM_HANDLER_THREADS 10	/* number of threads */
 
-/* function prototype */
+/* function prototypes */
 void add_request(int client_socket, 
 			pthread_mutex_t* p_mutex, 
 			pthread_cond_t*  p_cond_var);
 struct request* get_request(pthread_mutex_t* p_mutex);
 void handle_request(struct request* a_request, int thread_id);
 void* handle_requests_loop(void* data);
+
+void sigint_handler(int sig);
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -42,12 +45,15 @@ struct request* last_request = NULL;	/* pointer to the last request 	   */
  */
 int main(int argc, char** argv) {
 
+	system("clear");
+
 	int socket_desc, client_sock, c;
 	struct sockaddr_in server, client;
 
 	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs 		   */
 	pthread_t p_threads[NUM_HANDLER_THREADS];	/* thread's structures */
-	struct timespec delay;
+
+	signal(SIGINT, sigint_handler);
 
 	/* create socket */
 	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -83,7 +89,7 @@ int main(int argc, char** argv) {
 	puts("Bind done");
 
 	/* listen */
-	listen(socket_desc, 3);
+	listen(socket_desc, 10);
 
 	/* create threads */
 	for (int i = 0; i < NUM_HANDLER_THREADS; i++) {
@@ -108,8 +114,10 @@ int main(int argc, char** argv) {
 		perror("accept");
 		exit(1);
 	}
+	
+	close(socket_desc);
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 /*
@@ -200,16 +208,26 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  * output:    none.
  */
 void handle_request(struct request* a_request, int thread_id) {
-	char* message = "Greeting from server\n";
-
-	write(a_request->socket, message, strlen(message));
+	int message = 1;
+	char* client_message[2000];
+	int read_size;
 
     if (a_request) {
-      	printf("Thread '%d' handled request of socket '%d'\n
-      			Current number of requests: %d\n",
+      	printf("Thread '%d' handled request of socket '%d'\nCurrent number of requests: %d\n",
             	thread_id, a_request->socket, num_requests);
       	fflush(stdout);
     }
+
+    while ((read_size = recv(a_request->socket, client_message, 2000, 0)) > 0) {
+    	write(a_request->socket, &message, sizeof(message));
+    }
+
+    if (read_size == 0) {
+		puts("Client disconnected");
+		fflush(stdout);
+	} else if (read_size == -1) {
+		perror("recv");
+	}
 }
 
 /*
@@ -252,4 +270,9 @@ void* handle_requests_loop(void* data) {
             /* is locked again.										 */
         }
     }
+}
+
+void sigint_handler(int sig) {
+	puts("SIGINT\n");
+	exit(sig);
 }

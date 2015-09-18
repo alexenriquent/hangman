@@ -1,15 +1,22 @@
 #include <stdio.h>		/* standard I/O routines */
 #include <stdlib.h>
+#include <stdbool.h> 	/* boolean */
 #include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>	/* inet_addr */
 
+/* function prototypes */
+void welcome_message();
+int menu();
+bool logon(int socket);
+
+
 int main(int argc, char** argv) {
 
-	int socket_desc;
+	int socket_desc, read_size;
 	struct sockaddr_in server;
-	char server_message[2000];
+	int option;
 
 	/* Check command line arguments */
 	if (argc != 3) {
@@ -39,15 +46,101 @@ int main(int argc, char** argv) {
 	}
 	puts("Connected\n");
 
-	while (1) {
-		if (recv(socket_desc, server_message, 2000, 0) < 0) {
-			puts("reve failed");
+	/* keep communicating with server */
+	do {
+		welcome_message();
+
+		if (logon(socket_desc)) {
+			system("clear");
+			option = menu();
+		} else {
+			printf("\nYou entered either an incorrect username or password - disconnecting\n");
 			break;
 		}
-		puts(server_message);
-	}
+	} while (option != 3);
 
 	close(socket_desc);
 
-	return 0;
+	return EXIT_SUCCESS;
 }
+
+void welcome_message() {
+	system("clear");
+	printf("\n===========================================");
+	printf("\n\nWelcome to the Online Hangman Game System\n\n");
+	printf("===========================================\n");
+}
+
+int menu() {
+	int opt, temp, status;
+
+	printf("\n\nPlease enter a selection\n");
+	printf("(1) Play Hangman\n");
+	printf("(2) Show Leaderboard\n");
+	printf("(3) Quit\n\n");
+
+	printf("Selection option 1-3: ");
+	status = scanf("%d", &opt);
+
+	while (status != 1 || opt < 1 || opt > 3) {
+		while ((temp = getchar()) != EOF && temp != '\n');
+		puts("invalid input");
+		printf("Selection option 1-3: ");
+		status = scanf("%d", &opt);
+	}
+
+	return opt;
+}
+
+bool logon(int socket) {
+	char username[16], password[16];
+	int server_signal;
+	bool valid;
+
+	printf("\n\nYou are required to logon with your registered username and password\n");
+	printf("\nPlease enter your username: ");
+	scanf("%s", username);
+
+	if (send(socket, username, strlen(username), 0) < 0) {
+		puts("send failed");
+		return false;
+	}
+
+	while (1) {
+		if (recv(socket, &server_signal, sizeof(server_signal), 0) < 0) {
+			puts("recv failed");
+			break;
+		}
+		if (server_signal == 1) {
+			valid = true;
+			break;
+		} else {
+			valid = false;
+			break;
+		}
+	}
+
+	printf("Please enter your password: ");
+	scanf("%s", password);
+
+	if (send(socket, password, strlen(password), 0) < 0) {
+		puts("send failed");
+		return false;
+	}
+
+	while (1) {
+		if (recv(socket, &server_signal, sizeof(server_signal), 0) < 0) {
+			puts("recv failed");
+			break;
+		}
+		if (server_signal == 1) {
+			valid = true;
+			break;
+		} else {
+			valid = false;
+			break;
+		}
+	}
+
+	return valid;
+} 
