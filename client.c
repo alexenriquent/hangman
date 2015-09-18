@@ -6,6 +6,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>	/* inet_addr */
 
+#define USERNAME_LENGTH 16		/* maximum word length for username */
+#define PASSWORD_LENGTH 16		/* maximum word length for password */
+
 /* function prototypes */
 void welcome_message();
 int menu();
@@ -96,7 +99,8 @@ int menu() {
 }
 
 bool logon(int socket) {
-	char username[16], password[16];
+	char username[USERNAME_LENGTH];
+	char password[PASSWORD_LENGTH];
 	int server_signal;
 	bool valid;
 
@@ -109,20 +113,6 @@ bool logon(int socket) {
 		return false;
 	}
 
-	while (1) {
-		if (recv(socket, &server_signal, sizeof(server_signal), 0) < 0) {
-			puts("recv failed");
-			break;
-		}
-		if (server_signal == 1) {
-			valid = true;
-			break;
-		} else {
-			valid = false;
-			break;
-		}
-	}
-	printf("%d\n", server_signal);
 	printf("Please enter your password: ");
 	scanf("%s", password);
 
