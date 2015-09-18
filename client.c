@@ -11,7 +11,9 @@ void welcome_message();
 int menu();
 bool logon(int socket);
 
-
+/* 
+ * main function 
+ */
 int main(int argc, char** argv) {
 
 	int socket_desc, read_size;
@@ -119,7 +121,7 @@ bool logon(int socket) {
 			break;
 		}
 	}
-
+	printf("%d\n", server_signal);
 	printf("Please enter your password: ");
 	scanf("%s", password);
 

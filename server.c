@@ -10,8 +10,29 @@
 #include <signal.h>
 #include <errno.h>
 
-#define DEFAULT_PORT 12345		/* default port 	 */
+#define DEFAULT_PORT 12345		/* default port */
 #define NUM_HANDLER_THREADS 10	/* number of threads */
+#define MAX_NUM_WORDS 2048		/* maximum number of words */
+#define MAX_WORD_LENGTH 256		/* maximum word length */
+#define AUTH_WORD_LENGTH 16		/* maximum word length for authentication */
+#define NUM_USERS 10			/* number of users */
+
+/* structure of a single request */
+struct request {
+	int socket;					/* socket descriptor */
+	struct request* next;		/* pointer to next request */
+};
+
+/* structure of a user */
+struct user {
+	char username[AUTH_WORD_LENGTH]; 	/* username */
+	char password[AUTH_WORD_LENGTH];	/* password */
+};
+
+/* structure of data read from file */
+struct data {
+	char words[MAX_NUM_WORDS][MAX_WORD_LENGTH]; 	/* data from file */ 
+};
 
 /* function prototypes */
 void add_request(int client_socket, 
@@ -22,6 +43,9 @@ void handle_request(struct request* a_request, int thread_id);
 void* handle_requests_loop(void* data);
 
 void sigint_handler(int sig);
+struct data read_file(char* filename);
+void tokenise_auth(char word_list[][MAX_WORD_LENGTH]);
+void authenticate(int client_socket);
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -31,14 +55,10 @@ pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER;
 
 int num_requests = 0; /* number of pending request, initially none */
 
-/* structure of a single request */
-struct request {
-	int socket;					/* socket descriptor 	   */
-	struct request* next;		/* pointer to next request */
-};
-
 struct request* requests = NULL;		/* head of linked list of requests */
-struct request* last_request = NULL;	/* pointer to the last request 	   */
+struct request* last_request = NULL;	/* pointer to the last request */
+
+struct user users[NUM_USERS];			/* user records */
 
 /* 
  * main function 
@@ -50,7 +70,7 @@ int main(int argc, char** argv) {
 	int socket_desc, client_sock, c;
 	struct sockaddr_in server, client;
 
-	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs 		   */
+	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs */
 	pthread_t p_threads[NUM_HANDLER_THREADS];	/* thread's structures */
 
 	signal(SIGINT, sigint_handler);
@@ -131,7 +151,7 @@ void add_request(int client_socket,
             pthread_mutex_t* p_mutex,
             pthread_cond_t*  p_cond_var) {
   	int rc;                         /* return code of pthreads functions */
-  	struct request* a_request;      /* pointer to newly added request 	 */
+  	struct request* a_request;      /* pointer to newly added request */
 
   	/* create structure with new request */
  	 a_request = (struct request*)malloc(sizeof(struct request));
@@ -176,7 +196,7 @@ void add_request(int client_socket,
  */
 struct request* get_request(pthread_mutex_t* p_mutex) {
   	int rc;                         /* return code of pthreads functions */
-  	struct request* a_request;      /* pointer to request 				 */
+  	struct request* a_request;      /* pointer to request */
 
   	/* lock the mutex, to assure exclusive access to the list */
   	rc = pthread_mutex_lock(p_mutex);
@@ -209,8 +229,7 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  */
 void handle_request(struct request* a_request, int thread_id) {
 	int message = 1;
-	char* client_message[2000];
-	int read_size;
+	// char client_message[2000];
 
     if (a_request) {
       	printf("Thread '%d' handled request of socket '%d'\nCurrent number of requests: %d\n",
@@ -218,16 +237,7 @@ void handle_request(struct request* a_request, int thread_id) {
       	fflush(stdout);
     }
 
-    while ((read_size = recv(a_request->socket, client_message, 2000, 0)) > 0) {
-    	write(a_request->socket, &message, sizeof(message));
-    }
-
-    if (read_size == 0) {
-		puts("Client disconnected");
-		fflush(stdout);
-	} else if (read_size == -1) {
-		perror("recv");
-	}
+    authenticate(a_request->socket);
 }
 
 /*
@@ -241,8 +251,8 @@ void handle_request(struct request* a_request, int thread_id) {
  */
 void* handle_requests_loop(void* data) {
     int rc;                         /* return code of pthreads functions */
-    struct request* a_request;      /* pointer to a request 			 */
-    int thread_id = *((int*)data);  /* thread identifying number 	   	 */
+    struct request* a_request;      /* pointer to a request */
+    int thread_id = *((int*)data);  /* thread identifying number */
 
     /* lock the mutex, to access the requests list exclusively */
     rc = pthread_mutex_lock(&request_mutex);
@@ -263,11 +273,11 @@ void* handle_requests_loop(void* data) {
         } else {
             /* wait for a request to arrive. the mutex will be 		*/
             /* unlocked here, thus allowing other threads access to */
-            /* requests list.                                       */
+            /* requests list.*/
 
             rc = pthread_cond_wait(&got_request, &request_mutex);
             /* and after returning from pthread_cond_wait, the mutex */
-            /* is locked again.										 */
+            /* is locked again. */
         }
     }
 }
@@ -275,4 +285,99 @@ void* handle_requests_loop(void* data) {
 void sigint_handler(int sig) {
 	puts("SIGINT\n");
 	exit(sig);
+}
+
+struct data read_file(char* filename) {
+	struct data lines;
+    int line_index = 0;
+    
+    FILE *file = fopen(filename, "r");
+    char line[MAX_WORD_LENGTH];
+    
+    while (fgets(line, sizeof(line), file)) {
+    	if (line_index != 0) {
+    		strcpy(lines.words[line_index], line);
+    	}
+        line_index++;
+    }
+
+    fclose(file);
+    return lines;
+}
+
+void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
+	for (int i = 0; i <= NUM_USERS; i++) {
+    	int separater = 0;
+    	char* token = strtok(word_list[i], " \t");
+    	while(token != NULL) {
+    		if (separater == 0) {
+    			strcpy(users[i].username, token);
+    		} else {
+    			strcpy(users[i].password, token);
+    		}
+    		separater++;
+    		token = strtok(NULL, " \t");
+    	}
+    }
+}
+
+void authenticate(int client_socket) {
+	char message[2000];
+	int response;
+	bool valid;
+	tokenise_auth(read_file("Authentication.txt").words);
+
+	for (int i = 1; i <= 10; i++) {
+    	printf("username %d: %s\t", i, users[i].username);
+    	printf("password %d: %s", i, users[i].password);
+    }
+
+	while (1) {
+		if (recv(client_socket, message, 2000, 0) < 0) {
+			puts("recv failed");
+			break;
+		}
+		printf("%s\n", message);
+		for (int i = 0; i < NUM_USERS; i++) {
+			if (strcmp(message, users[i].username) == 0) {
+				valid = true;
+				break;
+			} else {
+				valid = false;
+			}
+		}
+		if (valid) {
+			response = 1;
+			write(client_socket, &response, sizeof(response));
+			break;
+		} else {
+			response = 0;
+			write(client_socket, &response, sizeof(response));
+			break;
+		}
+	}
+
+	while (1) {
+		if (recv(client_socket, message, 2000, 0) < 0) {
+			puts("recv failed");
+			break;
+		}
+		for (int i = 0; i < NUM_USERS; i++) {
+			if (strcmp(message, users[i].password) == 0) {
+				valid = true;
+				break;
+			} else {
+				valid = false;
+			}
+		}
+		if (valid) {
+			response = 1;
+			write(client_socket, &response, sizeof(response));
+			break;
+		} else {
+			response = 0;
+			write(client_socket, &response, sizeof(response));
+			break;
+		}
+	}
 }
