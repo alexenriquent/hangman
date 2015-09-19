@@ -19,6 +19,8 @@
 #define NUM_USERS 10			/* number of users */
 #define DATA_LENGTH	2048		/* general data length */
 
+#define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
+
 /* structure of a single request */
 struct request {
 	int socket;					/* socket descriptor */
@@ -45,10 +47,11 @@ void handle_request(struct request* a_request, int thread_id);
 void* handle_requests_loop(void* data);
 
 void sigint_handler(int sig);
-void send_string(int client_socket, char message[]);
+void send_string(int client_socket, char buffer[]);
 void send_int(int client_socket, int integer);
-void receive_string(int client_socket, char message[]);
+void receive_string(int client_socket, char buffer[]);
 int receive_int(int client_socket);
+void clear_buffer(char buffer[]);
 struct data read_file(char* filename);
 struct data read_words(char* filename);
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]);
@@ -236,7 +239,7 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  * output:    none.
  */
 void handle_request(struct request* a_request, int thread_id) {
-    int client_signal = 0;
+    int client_signal;
 
     if (a_request) {
       	printf("Thread '%d' handled request of socket '%d'\n",
@@ -247,15 +250,7 @@ void handle_request(struct request* a_request, int thread_id) {
 
     if (authenticate(a_request->socket)) {
     	do {
-    		while (1) {
-    			if (recv(a_request->socket, &client_signal, 
-    				sizeof(client_signal), 0) < 0) {
-					puts("recv failed");
-					break;
-				} else {
-					break;
-				}
-    		}
+    		client_signal = receive_int(a_request->socket);
 			switch (client_signal) {
 				case 1:
 					play_hangman(a_request->socket);
@@ -315,8 +310,8 @@ void sigint_handler(int sig) {
 	exit(sig);
 }
 
-void send_string(int client_socket, char message[]) {
-	if (send(client_socket, message, strlen(message), 0) < 0) {
+void send_string(int client_socket, char buffer[]) {
+	if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
 		puts("send failed");
 		return;
 	}
@@ -329,9 +324,9 @@ void send_int(int client_socket, int integer) {
 	}
 }
 
-void receive_string(int client_socket, char message[]) {
+void receive_string(int client_socket, char buffer[]) {
 	while (1) {
-		if (recv(client_socket, message, DATA_LENGTH, 0) < 0) {
+		if (recv(client_socket, buffer, DATA_LENGTH, 0) < 0) {
 			puts("recv failed");
 			break;
 		} else {
@@ -352,6 +347,10 @@ int receive_int(int client_socket) {
 		}
 	}
 	return integer;
+}
+
+void clear_buffer(char buffer[]) {
+	memset(buffer, 0, sizeof(buffer));
 }
 
 struct data read_file(char* filename) {
@@ -447,17 +446,70 @@ bool authenticate(int client_socket) {
 	}
 
 	send_int(client_socket, response);
+	clear_buffer(client_username);
+	clear_buffer(client_password);
 
 	return valid;
 }
 
 void play_hangman(int client_socket) {
-	int word_length, num_guesses;
+	int word_length, num_guesses, sig;
 	char rand_word[MAX_WORD_LENGTH];
-	char guessed_letters[DATA_LENGTH] = " ";
-	char word[DATA_LENGTH] = " ";
-	char letter[DATA_LENGTH] = " ";
+	char guessed_letters[DATA_LENGTH];
+	char word[DATA_LENGTH];
+	char letter[DATA_LENGTH];
+	char* found;
 
 	strcpy(rand_word, read_words("hangman_text.txt").words[0]);
 	word_length = strlen(rand_word);
+
+	num_guesses = MIN(word_length + 10, 26);
+	send_int(client_socket, num_guesses);
+
+	while (sig != 1 && num_guesses > 0) {
+        word[0] = '\0';
+		for (int i = 0; i < word_length; i++) {
+        	bool flag = false;
+        	for (int j = 0; j < strlen(guessed_letters); j++) {
+            	if (rand_word[i] == guessed_letters[j]) {
+                	rand_word[i] = guessed_letters[j];
+                	char c[2] = {rand_word[i], '\0'};
+                	strcat(word, c);
+                	strcat(word, " ");
+                	flag = true;
+                	break;
+            	}
+       		}
+        	if (!flag) {
+            	if (rand_word[i] != ',') {
+                	strcat(word, "_ ");
+            	} else {
+                	strcat(word, "  ");
+            	}
+        	}
+    	}
+    	printf("%s\n", word);
+    	printf("%s\n", guessed_letters);  
+
+    	found = strchr(word, '_');
+    	if (found) {
+    		sig = 0;
+    	} else {
+    		sig = 1;
+    	}
+    	
+    	send_int(client_socket, sig);
+    	send_string(client_socket, word);
+
+    	if (sig != 1) {
+    		receive_string(client_socket, letter);
+    		strcat(guessed_letters, letter);
+    		clear_buffer(letter);
+    		num_guesses--;
+    	}
+	}
+
+	sig = 0;
+	clear_buffer(guessed_letters);
+	printf("\nFinished\n");
 }

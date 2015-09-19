@@ -11,14 +11,12 @@
 #define WORD_LENGTH 16			/* maximum word length */
 #define DATA_LENGTH	2048		/* general data length */
 
-
-#define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
-
 /* function prototypes */
-void send_string(int socket, char message[]);
+void send_string(int socket, char buffer[]);
 void send_int(int socket, int integer);
-void receive_string(int socket, char message[]);
+void receive_string(int socket, char buffer[]);
 int receive_int(int socket);
+void clear_buffer(char buffer[]);
 
 void welcome();
 int menu();
@@ -91,8 +89,8 @@ int main(int argc, char** argv) {
 	return EXIT_SUCCESS;
 }
 
-void send_string(int socket, char message[]) {
-	if (send(socket, message, strlen(message), 0) < 0) {
+void send_string(int socket, char buffer[]) {
+	if (send(socket, buffer, strlen(buffer), 0) < 0) {
 		puts("send failed");
 		return;
 	}
@@ -105,9 +103,9 @@ void send_int(int socket, int integer) {
 	}
 }
 
-void receive_string(int socket, char message[]) {
+void receive_string(int socket, char buffer[]) {
 	while (1) {
-		if (recv(socket, message, DATA_LENGTH, 0) < 0) {
+		if (recv(socket, buffer, DATA_LENGTH, 0) < 0) {
 			puts("recv failed");
 			break;
 		} else {
@@ -128,6 +126,10 @@ int receive_int(int socket) {
 		}
 	}
 	return integer;
+}
+
+void clear_buffer(char buffer[]) {
+	memset(buffer, 0, sizeof(buffer));
 }
 
 void welcome() {
@@ -187,8 +189,29 @@ bool logon(int socket) {
 } 
 
 void play(int socket) {
-	int word_length, num_guesses;
+	int num_guesses, sig;
 	char letter[DATA_LENGTH];
 	char guessed_letters[DATA_LENGTH];
 	char word[DATA_LENGTH];
+	char* found;
+
+	num_guesses = receive_int(socket);
+
+	while (sig != 1 && num_guesses > 0) {
+		printf("Guessed letters: %s\n", guessed_letters);
+		printf("Number of guesses left: %d\n", num_guesses);
+		sig = receive_int(socket);
+		receive_string(socket, word);
+		printf("Word: %s\n", word);
+		if (sig != 1) {
+			printf("Input: ");
+        	scanf("%s", letter);
+        	send_string(socket, letter);
+        	strcat(guessed_letters, letter);
+        	num_guesses--;
+		}
+	}
+
+	sig = 0;
+	clear_buffer(guessed_letters);
 }
