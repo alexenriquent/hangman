@@ -55,8 +55,8 @@ void clear_buffer(char buffer[]);
 struct data read_file(char* filename);
 struct data read_words(char* filename);
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]);
-bool authenticate(int client_socket);
-void play_hangman(int client_socket);
+bool authenticate(int client_socket, char credential[]);
+void play_hangman(int client_socket, char credential[]);
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -240,6 +240,7 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  */
 void handle_request(struct request* a_request, int thread_id) {
     int client_signal;
+    char credential[MAX_WORD_LENGTH];
 
     if (a_request) {
       	printf("Thread '%d' handled request of socket '%d'\n",
@@ -248,12 +249,12 @@ void handle_request(struct request* a_request, int thread_id) {
       	fflush(stdout);
     }
 
-    if (authenticate(a_request->socket)) {
+    if (authenticate(a_request->socket, credential)) {
     	do {
     		client_signal = receive_int(a_request->socket);
 			switch (client_signal) {
 				case 1:
-					play_hangman(a_request->socket);
+					play_hangman(a_request->socket, credential);
 					break;
 				case 2:
 
@@ -411,7 +412,7 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
     }
 }
 
-bool authenticate(int client_socket) {
+bool authenticate(int client_socket, char credential[]) {
 	int response;
 	char username[USERNAME_LENGTH];
 	char client_username[DATA_LENGTH];
@@ -427,6 +428,7 @@ bool authenticate(int client_socket) {
 
     receive_string(client_socket, client_username);
 	receive_string(client_socket, client_password);
+	strcpy(credential, client_username);
 	printf("%s\n", client_username);
 	printf("%s\n", client_password);
 
@@ -452,7 +454,7 @@ bool authenticate(int client_socket) {
 	return valid;
 }
 
-void play_hangman(int client_socket) {
+void play_hangman(int client_socket, char credential[]) {
 	int word_length, num_guesses, sig;
 	char rand_word[MAX_WORD_LENGTH];
 	char guessed_letters[DATA_LENGTH];

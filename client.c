@@ -20,8 +20,8 @@ void clear_buffer(char buffer[]);
 
 void welcome();
 int menu();
-bool logon(int socket);
-void play(int socket);
+bool logon(int socket, char credential[]);
+void play(int socket, char credential[]);
 
 /* 
  * main function 
@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
 	int socket_desc, read_size;
 	struct sockaddr_in server;
 	int option;
+	char credential[DATA_LENGTH];
 
 	/* Check command line arguments */
 	if (argc != 3) {
@@ -63,7 +64,7 @@ int main(int argc, char** argv) {
 	/* keep communicating with server */
 	welcome();
 
-	if (logon(socket_desc)) {
+	if (logon(socket_desc, credential)) {
 		do {
 			// system("clear");
 			welcome();
@@ -72,7 +73,7 @@ int main(int argc, char** argv) {
 
 			switch(option) {
 				case 1:
-					play(socket_desc);
+					play(socket_desc, credential);
 					break;
 				case 2:
 					printf("Option 2");
@@ -160,7 +161,7 @@ int menu() {
 	return opt;
 }
 
-bool logon(int socket) {
+bool logon(int socket, char credential[]) {
 	int server_signal;
 	char username[USERNAME_LENGTH];
 	char password[PASSWORD_LENGTH];
@@ -172,6 +173,7 @@ bool logon(int socket) {
 	printf("\nPlease enter your username: ");
 	scanf("%s", username);
 	send_string(socket, username);
+	strcpy(credential, username);
 
 	printf("Please enter your password: ");
 	scanf("%s", password);
@@ -188,7 +190,7 @@ bool logon(int socket) {
 	return valid;
 } 
 
-void play(int socket) {
+void play(int socket, char credential[]) {
 	int num_guesses, sig;
 	char letter[DATA_LENGTH];
 	char guessed_letters[DATA_LENGTH];
@@ -198,18 +200,27 @@ void play(int socket) {
 	num_guesses = receive_int(socket);
 
 	while (sig != 1 && num_guesses > 0) {
-		printf("Guessed letters: %s\n", guessed_letters);
-		printf("Number of guesses left: %d\n", num_guesses);
+		printf("\n\nGuessed letters: %s\n\n", guessed_letters);
+		printf("Number of guesses left: %d\n\n", num_guesses);
 		sig = receive_int(socket);
 		receive_string(socket, word);
-		printf("Word: %s\n", word);
+		printf("Word: %s\n\n", word);
 		if (sig != 1) {
-			printf("Input: ");
+			printf("Enter your guess: ");
         	scanf("%s", letter);
         	send_string(socket, letter);
         	strcat(guessed_letters, letter);
+        	printf("\n-----------------------------\n\n");
         	num_guesses--;
 		}
+	}
+
+	printf("Game over\n\n");
+	if (sig == 1) {
+		printf("Well done %s! You won this round of Hangman!\n\n", credential);
+	} else {
+		printf("Bad luck %s! You have run out of guesses. ", credential);
+		printf("The Hangman got you!\n");
 	}
 
 	sig = 0;
