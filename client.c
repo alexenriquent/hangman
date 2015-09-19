@@ -8,11 +8,15 @@
 
 #define USERNAME_LENGTH 16		/* maximum word length for username */
 #define PASSWORD_LENGTH 16		/* maximum word length for password */
+#define WORD_LENGTH 16			/* maximum word length */
+
+#define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
 
 /* function prototypes */
-void welcome_message();
+void welcome();
 int menu();
 bool logon(int socket);
+void play(int socket);
 
 /* 
  * main function 
@@ -52,12 +56,12 @@ int main(int argc, char** argv) {
 	puts("Connected\n");
 
 	/* keep communicating with server */
-	welcome_message();
+	welcome();
 
 	if (logon(socket_desc)) {
 		do {
 			system("clear");
-			welcome_message();
+			welcome();
 			option = menu();
 
 			switch(option) {
@@ -79,7 +83,7 @@ int main(int argc, char** argv) {
 	return EXIT_SUCCESS;
 }
 
-void welcome_message() {
+void welcome() {
 	system("clear");
 	printf("\n===========================================");
 	printf("\n\nWelcome to the Online Hangman Game System\n\n");
@@ -146,3 +150,60 @@ bool logon(int socket) {
 
 	return valid;
 } 
+
+void play(int socket) {
+	char letter[WORD_LENGTH];
+	char guessed_letters[2048];
+	char word[2048];
+	int word_length, num_guesses;
+	bool win = false;
+	char* pch;
+
+	while (1) {
+		if (recv(socket, &word_length, sizeof(word_length), 0) < 0) {
+			puts("recv failed");
+			break;
+		} else {
+			num_guesses = MIN(word_length + 10, 26);
+			break;
+		}
+	}
+
+	while (num_guesses > 0 || !win) {
+		while (1) {
+			if (recv(socket, guessed_letters, 2048, 0) < 0) {
+				puts("recv failed");
+				break;
+			} else {
+				printf("\nGuessed letters: %s\n", guessed_letters);
+				break;
+			}
+		}
+
+		printf("Number of guesses left: %d\n", num_guesses);
+
+		while (1) {
+			if (recv(socket, word, 2048, 0) < 0) {
+				puts("recv failed");
+				break;
+			} else {
+				printf("\nWord: %s\n", word);
+				break;
+			}
+		}
+
+		pch = strchr(word, '_');
+		if (pch == NULL) {
+			win = true;
+		}
+
+		printf("Enter your guess: ");
+		scanf("%s", letter);
+		num_guesses--;
+
+		if (send(socket, letter, strlen(letter), 0) < 0) {
+			puts("send failed");
+			break;
+		}
+	}
+}

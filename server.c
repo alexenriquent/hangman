@@ -45,8 +45,10 @@ void* handle_requests_loop(void* data);
 
 void sigint_handler(int sig);
 struct data read_file(char* filename);
+struct data read_words(char* filename);
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]);
-void authenticate(int client_socket);
+bool authenticate(int client_socket);
+void play_hangman(int client_socket);
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -229,16 +231,16 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  * output:    none.
  */
 void handle_request(struct request* a_request, int thread_id) {
-	int message = 1;
-	// char client_message[2000];
-
     if (a_request) {
-      	printf("Thread '%d' handled request of socket '%d'\nCurrent number of requests: %d\n",
-            	thread_id, a_request->socket, num_requests);
+      	printf("Thread '%d' handled request of socket '%d'\n",
+            	thread_id, a_request->socket);
+      	printf("Current number of requests: %d\n", num_requests);
       	fflush(stdout);
     }
 
-    authenticate(a_request->socket);
+    if (authenticate(a_request->socket)) {
+    	play_hangman(a_request->socket);
+    }
 }
 
 /*
@@ -310,6 +312,26 @@ struct data read_file(char* filename) {
     return lines;
 }
 
+struct data read_words(char* filename) {
+	struct data lines;
+    int line_index = 0;
+    
+    FILE *file = fopen(filename, "r");
+    char line[MAX_WORD_LENGTH];
+    
+    while (fgets(line, sizeof(line), file)) {
+    	char* pc;
+        while (pc = strpbrk(line, "\n\r")) {
+            *pc = 0;
+        }
+    	strcpy(lines.words[line_index], line);
+        line_index++;
+    }
+
+    fclose(file);
+    return lines;
+}
+
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
 	for (int i = 0; i < NUM_USERS; i++) {
     	int separater = 0;
@@ -326,7 +348,7 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
     }
 }
 
-void authenticate(int client_socket) {
+bool authenticate(int client_socket) {
 	char username[USERNAME_LENGTH];
 	char client_username[2048];
 	char client_password[2048];
@@ -368,12 +390,21 @@ void authenticate(int client_socket) {
 		}
 		if (valid) {
 			response = 1;
-			write(client_socket, &response, sizeof(response));
+			send(client_socket, &response, sizeof(response), 0);
 			break;
 		} else {
 			response = 0;
-			write(client_socket, &response, sizeof(response));
+			send(client_socket, &response, sizeof(response), 0);
 			break;
 		}
 	}
+
+	return valid;
+}
+
+void play_hangman(int client_socket) {
+	char word[MAX_WORD_LENGTH];
+
+	strcpy(word, read_words("hangman_text.txt").words[0]);
+	printf("%s\n", word);
 }
