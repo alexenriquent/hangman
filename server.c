@@ -17,6 +17,7 @@
 #define USERNAME_LENGTH 16		/* maximum word length for username */
 #define PASSWORD_LENGTH 16		/* maximum word length for password */
 #define NUM_USERS 10			/* number of users */
+#define DATA_LENGTH	2048		/* general data length */
 
 /* structure of a single request */
 struct request {
@@ -44,6 +45,10 @@ void handle_request(struct request* a_request, int thread_id);
 void* handle_requests_loop(void* data);
 
 void sigint_handler(int sig);
+void send_string(int client_socket, char message[]);
+void send_int(int client_socket, int integer);
+void receive_string(int client_socket, char message[]);
+int receive_int(int client_socket);
 struct data read_file(char* filename);
 struct data read_words(char* filename);
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]);
@@ -231,6 +236,8 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
  * output:    none.
  */
 void handle_request(struct request* a_request, int thread_id) {
+    int client_signal = 0;
+
     if (a_request) {
       	printf("Thread '%d' handled request of socket '%d'\n",
             	thread_id, a_request->socket);
@@ -239,7 +246,25 @@ void handle_request(struct request* a_request, int thread_id) {
     }
 
     if (authenticate(a_request->socket)) {
-    	play_hangman(a_request->socket);
+    	do {
+    		while (1) {
+    			if (recv(a_request->socket, &client_signal, 
+    				sizeof(client_signal), 0) < 0) {
+					puts("recv failed");
+					break;
+				} else {
+					break;
+				}
+    		}
+			switch (client_signal) {
+				case 1:
+					play_hangman(a_request->socket);
+					break;
+				case 2:
+
+					break;
+			}
+    	} while (client_signal != 3);
     }
 }
 
@@ -290,9 +315,48 @@ void sigint_handler(int sig) {
 	exit(sig);
 }
 
+void send_string(int client_socket, char message[]) {
+	if (send(client_socket, message, strlen(message), 0) < 0) {
+		puts("send failed");
+		return;
+	}
+}
+
+void send_int(int client_socket, int integer) {
+	if (send(client_socket, &integer, sizeof(integer), 0) < 0) {
+		puts("send failed");
+		return;
+	}
+}
+
+void receive_string(int client_socket, char message[]) {
+	while (1) {
+		if (recv(client_socket, message, DATA_LENGTH, 0) < 0) {
+			puts("recv failed");
+			break;
+		} else {
+			break;
+		}
+	}
+}
+
+int receive_int(int client_socket) {
+	int integer;
+
+	while (1) {
+		if (recv(client_socket, &integer, sizeof(integer), 0) < 0) {
+			puts("recv failed");
+			break;
+		} else {
+			break;
+		}
+	}
+	return integer;
+}
+
 struct data read_file(char* filename) {
+	int line_index = 0;
 	struct data lines;
-    int line_index = 0;
     
     FILE *file = fopen(filename, "r");
     char line[MAX_WORD_LENGTH];
@@ -313,8 +377,8 @@ struct data read_file(char* filename) {
 }
 
 struct data read_words(char* filename) {
+	int line_index = 0;
 	struct data lines;
-    int line_index = 0;
     
     FILE *file = fopen(filename, "r");
     char line[MAX_WORD_LENGTH];
@@ -349,10 +413,10 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
 }
 
 bool authenticate(int client_socket) {
-	char username[USERNAME_LENGTH];
-	char client_username[2048];
-	char client_password[2048];
 	int response;
+	char username[USERNAME_LENGTH];
+	char client_username[DATA_LENGTH];
+	char client_password[DATA_LENGTH];
 	bool valid;
 
 	tokenise_auth(read_file("Authentication.txt").words);
@@ -362,49 +426,38 @@ bool authenticate(int client_socket) {
     	printf("password %d: %s\n", i, users[i].password);
     }
 
-	while (1) {
-		if (recv(client_socket, client_username, 2048, 0) < 0) {
-			puts("recv failed");
+    receive_string(client_socket, client_username);
+	receive_string(client_socket, client_password);
+	printf("%s\n", client_username);
+	printf("%s\n", client_password);
+
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (strcmp(client_username, users[i].username) == 0 &&
+			strcmp(client_password, users[i].password) == 0) {
+			valid = true;
 			break;
 		} else {
-			strcpy(username, client_username);
-			printf("%s\n", client_username);
-			break;
+			valid = false;
 		}
+	}
+	if (valid) {
+		response = 1;
+	} else {
+		response = 0;
 	}
 
-	while (1) {
-		if (recv(client_socket, client_password, 2048, 0) < 0) {
-			puts("recv failed");
-			break;
-		}
-		printf("%s\n", client_password);
-		for (int i = 0; i < NUM_USERS; i++) {
-			if (strcmp(username, users[i].username) == 0 &&
-				strcmp(client_password, users[i].password) == 0) {
-				valid = true;
-				break;
-			} else {
-				valid = false;
-			}
-		}
-		if (valid) {
-			response = 1;
-			send(client_socket, &response, sizeof(response), 0);
-			break;
-		} else {
-			response = 0;
-			send(client_socket, &response, sizeof(response), 0);
-			break;
-		}
-	}
+	send_int(client_socket, response);
 
 	return valid;
 }
 
 void play_hangman(int client_socket) {
-	char word[MAX_WORD_LENGTH];
+	int word_length, num_guesses;
+	char rand_word[MAX_WORD_LENGTH];
+	char guessed_letters[DATA_LENGTH] = " ";
+	char word[DATA_LENGTH] = " ";
+	char letter[DATA_LENGTH] = " ";
 
-	strcpy(word, read_words("hangman_text.txt").words[0]);
-	printf("%s\n", word);
+	strcpy(rand_word, read_words("hangman_text.txt").words[0]);
+	word_length = strlen(rand_word);
 }

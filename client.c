@@ -9,10 +9,17 @@
 #define USERNAME_LENGTH 16		/* maximum word length for username */
 #define PASSWORD_LENGTH 16		/* maximum word length for password */
 #define WORD_LENGTH 16			/* maximum word length */
+#define DATA_LENGTH	2048		/* general data length */
+
 
 #define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
 
 /* function prototypes */
+void send_string(int socket, char message[]);
+void send_int(int socket, int integer);
+void receive_string(int socket, char message[]);
+int receive_int(int socket);
+
 void welcome();
 int menu();
 bool logon(int socket);
@@ -60,13 +67,14 @@ int main(int argc, char** argv) {
 
 	if (logon(socket_desc)) {
 		do {
-			system("clear");
+			// system("clear");
 			welcome();
 			option = menu();
+			send_int(socket_desc, option);
 
 			switch(option) {
 				case 1:
-					printf("Option 1");
+					play(socket_desc);
 					break;
 				case 2:
 					printf("Option 2");
@@ -83,8 +91,47 @@ int main(int argc, char** argv) {
 	return EXIT_SUCCESS;
 }
 
+void send_string(int socket, char message[]) {
+	if (send(socket, message, strlen(message), 0) < 0) {
+		puts("send failed");
+		return;
+	}
+}
+
+void send_int(int socket, int integer) {
+	if (send(socket, &integer, sizeof(integer), 0) < 0) {
+		puts("send failed");
+		return;
+	}
+}
+
+void receive_string(int socket, char message[]) {
+	while (1) {
+		if (recv(socket, message, DATA_LENGTH, 0) < 0) {
+			puts("recv failed");
+			break;
+		} else {
+			break;
+		}
+	}
+}
+
+int receive_int(int socket) {
+	int integer;
+
+	while (1) {
+		if (recv(socket, &integer, sizeof(integer), 0) < 0) {
+			puts("recv failed");
+			break;
+		} else {
+			break;
+		}
+	}
+	return integer;
+}
+
 void welcome() {
-	system("clear");
+	// system("clear");
 	printf("\n===========================================");
 	printf("\n\nWelcome to the Online Hangman Game System\n\n");
 	printf("===========================================\n");
@@ -112,98 +159,36 @@ int menu() {
 }
 
 bool logon(int socket) {
+	int server_signal;
 	char username[USERNAME_LENGTH];
 	char password[PASSWORD_LENGTH];
-	int server_signal;
 	bool valid;
 
-	printf("\n\nYou are required to logon with your registered username and password\n");
+	printf("\n\nYou are required to logon with");
+	printf("your registered username and password\n");
+
 	printf("\nPlease enter your username: ");
 	scanf("%s", username);
-
-	if (send(socket, username, strlen(username), 0) < 0) {
-		puts("send failed");
-		return false;
-	}
+	send_string(socket, username);
 
 	printf("Please enter your password: ");
 	scanf("%s", password);
+	send_string(socket, password);
 
-	if (send(socket, password, strlen(password), 0) < 0) {
-		puts("send failed");
-		return false;
-	}
+	server_signal = receive_int(socket);
 
-	while (1) {
-		if (recv(socket, &server_signal, sizeof(server_signal), 0) < 0) {
-			puts("recv failed");
-			break;
-		}
-		if (server_signal == 1) {
-			valid = true;
-			break;
-		} else {
-			valid = false;
-			break;
-		}
+	if (server_signal == 1) {
+		valid = true;
+	} else {
+		valid = false;
 	}
 
 	return valid;
 } 
 
 void play(int socket) {
-	char letter[WORD_LENGTH];
-	char guessed_letters[2048];
-	char word[2048];
 	int word_length, num_guesses;
-	bool win = false;
-	char* pch;
-
-	while (1) {
-		if (recv(socket, &word_length, sizeof(word_length), 0) < 0) {
-			puts("recv failed");
-			break;
-		} else {
-			num_guesses = MIN(word_length + 10, 26);
-			break;
-		}
-	}
-
-	while (num_guesses > 0 || !win) {
-		while (1) {
-			if (recv(socket, guessed_letters, 2048, 0) < 0) {
-				puts("recv failed");
-				break;
-			} else {
-				printf("\nGuessed letters: %s\n", guessed_letters);
-				break;
-			}
-		}
-
-		printf("Number of guesses left: %d\n", num_guesses);
-
-		while (1) {
-			if (recv(socket, word, 2048, 0) < 0) {
-				puts("recv failed");
-				break;
-			} else {
-				printf("\nWord: %s\n", word);
-				break;
-			}
-		}
-
-		pch = strchr(word, '_');
-		if (pch == NULL) {
-			win = true;
-		}
-
-		printf("Enter your guess: ");
-		scanf("%s", letter);
-		num_guesses--;
-
-		if (send(socket, letter, strlen(letter), 0) < 0) {
-			puts("send failed");
-			break;
-		}
-	}
+	char letter[DATA_LENGTH];
+	char guessed_letters[DATA_LENGTH];
+	char word[DATA_LENGTH];
 }
