@@ -269,9 +269,11 @@ void handle_request(struct request* a_request, int thread_id) {
 			switch (client_signal) {
 				case 1:
 					play_hangman(a_request->socket, credential);
+					fflush(stdout);
 					break;
 				case 2:
 					leaderboard(a_request->socket);
+					fflush(stdout);
 					break;
 			}
     	} while (client_signal != 3);
@@ -433,10 +435,10 @@ bool authenticate(int client_socket, char credential[]) {
 	char client_password[DATA_LENGTH];
 	bool valid;
 
-	for (int i = 0; i < NUM_USERS; i++) {
-    	printf("username %d: %s\t", i, users[i].username);
-    	printf("password %d: %s\n", i, users[i].password);
-    }
+	// for (int i = 0; i < NUM_USERS; i++) {
+ //    	printf("username %d: %s\t", i, users[i].username);
+ //    	printf("password %d: %s\n", i, users[i].password);
+ //    }
 
     receive_string(client_socket, client_username);
 	receive_string(client_socket, client_password);
@@ -502,6 +504,7 @@ void play_hangman(int client_socket, char credential[]) {
             	}
         	}
     	}
+
     	printf("%s\n", word);
     	printf("%s\n", guessed_letters);  
 
@@ -517,8 +520,11 @@ void play_hangman(int client_socket, char credential[]) {
 
     	if (sig != 1) {
     		receive_string(client_socket, letter);
+    		if (strcmp(letter, "") == 0) {
+    			break;
+    		}
     		strcat(guessed_letters, letter);
-    		clear_buffer(letter);
+    		clear_buffer(letter); 
     		num_guesses--;
     	}
 	}
@@ -530,21 +536,41 @@ void play_hangman(int client_socket, char credential[]) {
 	sig = 0;
 	increment_num_games_played(credential);
 	clear_buffer(guessed_letters);
-	printf("\nFinished\n");
-	printf("Number of games won: %d\n", get_num_games_won(credential));
-	printf("Number of games played: %d\n", get_num_games_played(credential));
+	clear_buffer(word);
 }
 
 void leaderboard(int client_socket) {
+	char leaderboard_data[DATA_LENGTH * 10];
+	char games_won[MAX_WORD_LENGTH];
+	char games_played[MAX_WORD_LENGTH];
+
 	qsort((void *)&users, NUM_USERS, sizeof(struct user), (compfn)compare);
 
+	leaderboard_data[0] = ' ';
 	for (int i = 0; i < NUM_USERS; i++) {
 		if (users[i].num_games_played > 0) {
-			printf("Player - %s\n", users[i].username);
-			printf("Number of games won: %d\n", users[i].num_games_won);
-			printf("Number of games played: %d\n", users[i].num_games_played);
+			sprintf(games_won, "%d", users[i].num_games_won);
+			sprintf(games_played, "%d", users[i].num_games_played);
+			strcat(leaderboard_data, "\n========================================\n\n");
+			strcat(leaderboard_data, "Player - ");
+			strcat(leaderboard_data, users[i].username);
+			strcat(leaderboard_data, "\nNumber of games won - ");
+			strcat(leaderboard_data, games_won);
+			strcat(leaderboard_data, "\nNumber of games played - ");
+			strcat(leaderboard_data, games_played);
+			strcat(leaderboard_data, "\n\n========================================\n");
 		}
 	}
+
+	if (strcmp(leaderboard_data, " ") == 0) {
+		strcat(leaderboard_data, "\n\nThere is no information currently stored in the Leader Board.\n");
+		strcat(leaderboard_data, "Try again later.\n\n");
+	}
+
+	// printf("%s\n", leaderboard_data);
+
+	send_string(client_socket, leaderboard_data);
+	clear_buffer(leaderboard_data);
 }
 
 int compare(struct user* user1, struct user* user2) {

@@ -22,6 +22,7 @@ void welcome();
 int menu();
 bool logon(int socket, char credential[]);
 void play(int socket, char credential[]);
+void leaderboard(int socket);
 
 /* 
  * main function 
@@ -66,20 +67,17 @@ int main(int argc, char** argv) {
 
 	if (logon(socket_desc, credential)) {
 		do {
-			// system("clear");
 			welcome();
 			option = menu();
 			send_int(socket_desc, option);
-
 			switch(option) {
 				case 1:
 					play(socket_desc, credential);
 					break;
 				case 2:
-					printf("Option 2");
+					leaderboard(socket_desc);
 					break;
 			}
-
 		} while (option != 3);
 	} else {
 		printf("\nYou entered either an incorrect username or password - disconnecting\n");
@@ -134,7 +132,6 @@ void clear_buffer(char buffer[]) {
 }
 
 void welcome() {
-	// system("clear");
 	printf("\n===========================================");
 	printf("\n\nWelcome to the Online Hangman Game System\n\n");
 	printf("===========================================\n");
@@ -200,7 +197,7 @@ void play(int socket, char credential[]) {
 	num_guesses = receive_int(socket);
 
 	while (sig != 1 && num_guesses > 0) {
-		printf("\n\nGuessed letters: %s\n\n", guessed_letters);
+		printf("\nGuessed letters: %s\n\n", guessed_letters);
 		printf("Number of guesses left: %d\n\n", num_guesses);
 		sig = receive_int(socket);
 		receive_string(socket, word);
@@ -225,4 +222,12 @@ void play(int socket, char credential[]) {
 
 	sig = 0;
 	clear_buffer(guessed_letters);
+}
+
+void leaderboard(int socket) {
+	char leaderboard_data[DATA_LENGTH * 10];
+
+	receive_string(socket, leaderboard_data);
+	printf("%s\n", leaderboard_data);
+	clear_buffer(leaderboard_data);
 }
