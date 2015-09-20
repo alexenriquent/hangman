@@ -21,6 +21,8 @@
 
 #define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
 
+typedef int (*compfn)(const void*, const void*);
+
 /* structure of a single request */
 struct request {
 	int socket;					/* socket descriptor */
@@ -31,6 +33,8 @@ struct request {
 struct user {
 	char username[USERNAME_LENGTH]; 	/* username */
 	char password[PASSWORD_LENGTH];		/* password */
+	int num_games_won;					/* number of games won */
+	int num_games_played;				/* number of games played */
 };
 
 /* structure of data read from file */
@@ -57,6 +61,13 @@ struct data read_words(char* filename);
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]);
 bool authenticate(int client_socket, char credential[]);
 void play_hangman(int client_socket, char credential[]);
+void leaderboard(int client_socket);
+int compare(struct user* user1, struct user* user2);
+int get_num_games_won(char credential[]);
+int get_num_games_played(char credential[]);
+void increment_num_games_won(char credential[]);
+void increment_num_games_played(char credential[]);
+bool statistic_available();
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -128,6 +139,9 @@ int main(int argc, char** argv) {
 		pthread_create(&p_threads[i], NULL, 
 			handle_requests_loop, (void*)&thr_id[i]);
 	}
+
+	/* tokenise users */
+	tokenise_auth(read_file("Authentication.txt").words);
 
 	/* accept an incomming connection */
 	puts("Waiting for incomming connection...");
@@ -257,7 +271,7 @@ void handle_request(struct request* a_request, int thread_id) {
 					play_hangman(a_request->socket, credential);
 					break;
 				case 2:
-
+					leaderboard(a_request->socket);
 					break;
 			}
     	} while (client_signal != 3);
@@ -419,8 +433,6 @@ bool authenticate(int client_socket, char credential[]) {
 	char client_password[DATA_LENGTH];
 	bool valid;
 
-	tokenise_auth(read_file("Authentication.txt").words);
-
 	for (int i = 0; i < NUM_USERS; i++) {
     	printf("username %d: %s\t", i, users[i].username);
     	printf("password %d: %s\n", i, users[i].password);
@@ -511,7 +523,96 @@ void play_hangman(int client_socket, char credential[]) {
     	}
 	}
 
+	if (sig == 1) {
+		increment_num_games_won(credential);
+	}
+
 	sig = 0;
+	increment_num_games_played(credential);
 	clear_buffer(guessed_letters);
 	printf("\nFinished\n");
+	printf("Number of games won: %d\n", get_num_games_won(credential));
+	printf("Number of games played: %d\n", get_num_games_played(credential));
+}
+
+void leaderboard(int client_socket) {
+	qsort((void *)&users, NUM_USERS, sizeof(struct user), (compfn)compare);
+
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (users[i].num_games_played > 0) {
+			printf("Player - %s\n", users[i].username);
+			printf("Number of games won: %d\n", users[i].num_games_won);
+			printf("Number of games played: %d\n", users[i].num_games_played);
+		}
+	}
+}
+
+int compare(struct user* user1, struct user* user2) {
+	double percentage1, percentage2;
+
+	percentage1 = (double)user1->num_games_won / (double)user1->num_games_played;
+	percentage2 = (double)user2->num_games_won / (double)user2->num_games_played;
+
+	if (user1->num_games_won < user2->num_games_won) {
+		return -1;
+	} else if (user1->num_games_won > user2->num_games_won) {
+		return 1;
+	} else {
+		if (percentage1 < percentage2) {
+			return -1;
+		} else if (percentage1 > percentage2) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+}
+
+int get_num_games_won(char credential[]) {
+	int result;
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (strcmp(credential, users[i].username) == 0) {
+			result = users[i].num_games_won;
+			break;
+		}
+	}
+	return result;
+}
+
+int get_num_games_played(char credential[]) {
+	int result;
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (strcmp(credential, users[i].username) == 0) {
+			result = users[i].num_games_played;
+			break;
+		}
+	}
+	return result;
+}
+
+void increment_num_games_won(char credential[]) {
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (strcmp(credential, users[i].username) == 0) {
+			users[i].num_games_won++;
+			break;
+		}
+	}
+}
+
+void increment_num_games_played(char credential[]) {
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (strcmp(credential, users[i].username) == 0) {
+			users[i].num_games_played++;
+			break;
+		}
+	}
+}
+
+bool statistic_available() {
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (users[i].num_games_played > 0) {
+			return true;
+		}
+	}
+	return false;
 }
