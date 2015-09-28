@@ -322,11 +322,25 @@ void* handle_requests_loop(void* data) {
     }
 }
 
+/*
+ * function sigint_handler(): the SIGINT handler.
+ * algorithm: gracefully exit the program after receiving
+ 			  SIGINT (Ctrl-C).
+ * input:     a signal received.
+ * output:    none.
+ */
 void sigint_handler(int sig) {
 	puts("SIGINT\n");
 	exit(sig);
 }
 
+/*
+ * function send_string(): send a string to a connected client.
+ * algorithm: send a string to a client specified by the socket 
+ 			  descriptor. If there is an error, return immediately.
+ * input:     client socket descriptor, string buffer.
+ * output:    none.
+ */
 void send_string(int client_socket, char buffer[]) {
 	if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
 		puts("send failed");
@@ -334,6 +348,13 @@ void send_string(int client_socket, char buffer[]) {
 	}
 }
 
+/*
+ * function send_int(): send an integer to a connected client.
+ * algorithm: send an integer to a client specified by the socket 
+ 			  descriptor. If there is an error, return immediately.
+ * input:     client socket descriptor, integer.
+ * output:    none.
+ */
 void send_int(int client_socket, int integer) {
 	if (send(client_socket, &integer, sizeof(integer), 0) < 0) {
 		puts("send failed");
@@ -341,6 +362,15 @@ void send_int(int client_socket, int integer) {
 	}
 }
 
+/*
+ * function receive_string(): receive a string from a connected client.
+ * algorithm: receive a string from a client specified by the socket 
+ 			  descriptor. The function will wait indefinitely until it 
+ 			  gets a reply. If there is an error, break out of the loop 
+ 			  and return immediately.
+ * input:     client socket descriptor, string buffer.
+ * output:    none.
+ */
 void receive_string(int client_socket, char buffer[]) {
 	while (1) {
 		if (recv(client_socket, buffer, DATA_LENGTH, 0) < 0) {
@@ -352,6 +382,15 @@ void receive_string(int client_socket, char buffer[]) {
 	}
 }
 
+/*
+ * function receive_int(): receive an integer from a connected client.
+ * algorithm: receive an integer from a client specified by the socket 
+ 			  descriptor. The function will wait indefinitely until it 
+ 			  gets a reply. If there is an error, break out of the loop 
+ 			  and return immediately.
+ * input:     client socket descriptor.
+ * output:    integer.
+ */
 int receive_int(int client_socket) {
 	int integer;
 
@@ -366,10 +405,22 @@ int receive_int(int client_socket) {
 	return integer;
 }
 
+/*
+ * function clear_buffer(): clear a buffer.
+ * algorithm: cleanup a specified buffer variable.
+ * input:     string buffer.
+ * output:    none.
+ */
 void clear_buffer(char buffer[]) {
 	memset(buffer, 0, sizeof(buffer));
 }
 
+/*
+ * function read_file(): read a text file.
+ * algorithm: read a text file and store data in the data struct.
+ * input:     file to be read.
+ * output:    data from the file in the form of the data struct.
+ */
 struct data read_file(char* filename) {
 	int line_index = 0;
 	struct data lines;
@@ -392,6 +443,12 @@ struct data read_file(char* filename) {
     return lines;
 }
 
+/*
+ * function read_words(): read a text file.
+ * algorithm: read a text file and store data in the data struct.
+ * input:     file to be read.
+ * output:    data from the file in the form of the data struct.
+ */
 struct data read_words(char* filename) {
 	int line_index = 0;
 	struct data lines;
@@ -412,6 +469,13 @@ struct data read_words(char* filename) {
     return lines;
 }
 
+/*
+ * function tokenise_auth(): tokenise data.
+ * algorithm: obtain user data, including username and password,
+ 			  tokenise and store each piece of data in the users struct.
+ * input:     array of data (usernames and passwords).
+ * output:    none.
+ */
 void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
 	for (int i = 0; i < NUM_USERS; i++) {
     	int separater = 0;
@@ -428,6 +492,15 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
     }
 }
 
+/*
+ * function authenticate(): authentication process.
+ * algorithm: authenticate a user by comparing credential 
+ 			  data received from a client with data stored
+ 			  in the users struct.
+ * input:     client socket descriptor, credential.
+ * output:    true if the client is successfully authenticated,
+ 			  false otherwise.
+ */
 bool authenticate(int client_socket, char credential[]) {
 	int response;
 	char username[USERNAME_LENGTH];
@@ -468,6 +541,12 @@ bool authenticate(int client_socket, char credential[]) {
 	return valid;
 }
 
+/*
+ * function play_hangman(): play the game of Hangman.
+ * algorithm: process the game of Hangman.
+ * input:     client socket descriptor, credential.
+ * output:    none.
+ */
 void play_hangman(int client_socket, char credential[]) {
 	int word_length, num_guesses, sig;
 	char rand_word[MAX_WORD_LENGTH];
@@ -539,6 +618,13 @@ void play_hangman(int client_socket, char credential[]) {
 	clear_buffer(word);
 }
 
+/*
+ * function leaderboard(): send the leaderboard.
+ * algorithm: format data obtained from the users struct
+ 			  and send it to a client.
+ * input:     client socket descriptor.
+ * output:    none.
+ */
 void leaderboard(int client_socket) {
 	char leaderboard_data[DATA_LENGTH * 10];
 	char games_won[MAX_WORD_LENGTH];
@@ -573,6 +659,21 @@ void leaderboard(int client_socket) {
 	clear_buffer(leaderboard_data);
 }
 
+/*
+ * function leaderboard(): compare user structs.
+ * algorithm: compare two players by numbers of games won.
+ 			  If both players have the same number of games
+ 			  won, compare the percentage of games won instead.
+ * input:     user 1, user 2.
+ * output:    -1 if the number of games won of user 1 (or percentage)
+ 				is lower than the number of games won of user 2
+ 				(or percentage).
+ 			  0 if the percentage of games won of user 1
+ 				is greater than the percentage of games won of user 2.
+ 			  1 if the number of games won of user 1 (or percentage)
+ 				is greater than the number of games won of user 2
+ 				(or percentage).
+ */
 int compare(struct user* user1, struct user* user2) {
 	double percentage1, percentage2;
 
@@ -594,6 +695,13 @@ int compare(struct user* user1, struct user* user2) {
 	}
 }
 
+/*
+ * function get_num_games_won(): get number of games won.
+ * algorithm: get the number of games won specified by a
+ 			  username.
+ * input:     credential (username).
+ * output:    number of games won.
+ */
 int get_num_games_won(char credential[]) {
 	int result;
 	for (int i = 0; i < NUM_USERS; i++) {
@@ -605,6 +713,13 @@ int get_num_games_won(char credential[]) {
 	return result;
 }
 
+/*
+ * function get_num_games_played(): get number of games played.
+ * algorithm: get the number of games played specified by a
+ 			  username.
+ * input:     credential (username).
+ * output:    number of games played.
+ */
 int get_num_games_played(char credential[]) {
 	int result;
 	for (int i = 0; i < NUM_USERS; i++) {
@@ -616,6 +731,13 @@ int get_num_games_played(char credential[]) {
 	return result;
 }
 
+/*
+ * function increment_num_games_won(): increment number of games won.
+ * algorithm: increment the number of games won specified by a
+ 			  username.
+ * input:     credential (username).
+ * output:    none.
+ */
 void increment_num_games_won(char credential[]) {
 	for (int i = 0; i < NUM_USERS; i++) {
 		if (strcmp(credential, users[i].username) == 0) {
@@ -625,6 +747,13 @@ void increment_num_games_won(char credential[]) {
 	}
 }
 
+/*
+ * function increment_num_games_played(): increment number of games played.
+ * algorithm: increment the number of games played specified by a
+ 			  username.
+ * input:     credential (username).
+ * output:    none.
+ */
 void increment_num_games_played(char credential[]) {
 	for (int i = 0; i < NUM_USERS; i++) {
 		if (strcmp(credential, users[i].username) == 0) {
@@ -634,6 +763,13 @@ void increment_num_games_played(char credential[]) {
 	}
 }
 
+/*
+ * function statistic_available(): check data availability.
+ * algorithm: check if the leaderboard data is available.
+ * input:     none.
+ * output:    true if the leaderboard data is available,
+ 			  false, otherwise.
+ */
 bool statistic_available() {
 	for (int i = 0; i < NUM_USERS; i++) {
 		if (users[i].num_games_played > 0) {

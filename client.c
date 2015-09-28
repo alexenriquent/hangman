@@ -17,7 +17,6 @@ void send_int(int socket, int integer);
 void receive_string(int socket, char buffer[]);
 int receive_int(int socket);
 void clear_buffer(char buffer[]);
-
 void welcome();
 int menu();
 bool logon(int socket, char credential[]);
@@ -88,6 +87,13 @@ int main(int argc, char** argv) {
 	return EXIT_SUCCESS;
 }
 
+/*
+ * function send_string(): send a string to a connected client.
+ * algorithm: send a string to a client specified by the socket 
+ 			  descriptor. If there is an error, return immediately.
+ * input:     client socket descriptor, string buffer.
+ * output:    none.
+ */
 void send_string(int socket, char buffer[]) {
 	if (send(socket, buffer, strlen(buffer), 0) < 0) {
 		puts("send failed");
@@ -95,6 +101,13 @@ void send_string(int socket, char buffer[]) {
 	}
 }
 
+/*
+ * function send_int(): send an integer to a connected client.
+ * algorithm: send an integer to a client specified by the socket 
+ 			  descriptor. If there is an error, return immediately.
+ * input:     client socket descriptor, integer.
+ * output:    none.
+ */
 void send_int(int socket, int integer) {
 	if (send(socket, &integer, sizeof(integer), 0) < 0) {
 		puts("send failed");
@@ -102,6 +115,15 @@ void send_int(int socket, int integer) {
 	}
 }
 
+/*
+ * function receive_string(): receive a string from a connected client.
+ * algorithm: receive a string from a client specified by the socket 
+ 			  descriptor. The function will wait indefinitely until it 
+ 			  gets a reply. If there is an error, break out of the loop 
+ 			  and return immediately.
+ * input:     client socket descriptor, string buffer.
+ * output:    none.
+ */
 void receive_string(int socket, char buffer[]) {
 	while (1) {
 		if (recv(socket, buffer, DATA_LENGTH, 0) < 0) {
@@ -113,6 +135,15 @@ void receive_string(int socket, char buffer[]) {
 	}
 }
 
+/*
+ * function receive_int(): receive an integer from a connected client.
+ * algorithm: receive an integer from a client specified by the socket 
+ 			  descriptor. The function will wait indefinitely until it 
+ 			  gets a reply. If there is an error, break out of the loop 
+ 			  and return immediately.
+ * input:     client socket descriptor.
+ * output:    integer.
+ */
 int receive_int(int socket) {
 	int integer;
 
@@ -127,10 +158,22 @@ int receive_int(int socket) {
 	return integer;
 }
 
+/*
+ * function clear_buffer(): clear a buffer.
+ * algorithm: cleanup a specified buffer variable.
+ * input:     string buffer.
+ * output:    none.
+ */
 void clear_buffer(char buffer[]) {
 	memset(buffer, 0, sizeof(buffer));
 }
 
+/*
+ * function welcome(): welcome message.
+ * algorithm: display a welcome message.
+ * input:     none.
+ * output:    none.
+ */
 void welcome() {
 	printf("\n===========================================");
 	printf("\n\nWelcome to the Online Hangman Game System\n\n");
@@ -158,6 +201,14 @@ int menu() {
 	return opt;
 }
 
+/*
+ * function logon(): authentication process.
+ * algorithm: authenticate the current user by sending username 
+ 			  and password to the server.
+ * input:     server socket descriptor, credential.
+ * output:    true if the current user is successfully authenticated,
+ 			  false otherwise.
+ */
 bool logon(int socket, char credential[]) {
 	int server_signal;
 	char username[USERNAME_LENGTH];
@@ -187,6 +238,12 @@ bool logon(int socket, char credential[]) {
 	return valid;
 } 
 
+/*
+ * function play_hangman(): play the game of Hangman.
+ * algorithm: process the game of Hangman.
+ * input:     server socket descriptor, credential.
+ * output:    none.
+ */
 void play(int socket, char credential[]) {
 	int num_guesses, sig;
 	char letter[DATA_LENGTH];
@@ -224,6 +281,12 @@ void play(int socket, char credential[]) {
 	clear_buffer(guessed_letters);
 }
 
+/*
+ * function leaderboard(): receive leaderboard.
+ * algorithm: receive and display the current leaderboard.
+ * input:     server socket descriptor.
+ * output:    none.
+ */
 void leaderboard(int socket) {
 	char leaderboard_data[DATA_LENGTH * 10];
 
