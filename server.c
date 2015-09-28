@@ -508,11 +508,6 @@ bool authenticate(int client_socket, char credential[]) {
 	char client_password[DATA_LENGTH];
 	bool valid;
 
-	// for (int i = 0; i < NUM_USERS; i++) {
- //    	printf("username %d: %s\t", i, users[i].username);
- //    	printf("password %d: %s\n", i, users[i].password);
- //    }
-
     receive_string(client_socket, client_username);
 	receive_string(client_socket, client_password);
 	strcpy(credential, client_username);
@@ -548,14 +543,16 @@ bool authenticate(int client_socket, char credential[]) {
  * output:    none.
  */
 void play_hangman(int client_socket, char credential[]) {
-	int word_length, num_guesses, sig;
+	int word_length, num_guesses, sig, random;
 	char rand_word[MAX_WORD_LENGTH];
 	char guessed_letters[DATA_LENGTH];
 	char word[DATA_LENGTH];
 	char letter[DATA_LENGTH];
 	char* found;
 
-	strcpy(rand_word, read_words("hangman_text.txt").words[0]);
+	random = rand() % 288;
+
+	strcpy(rand_word, read_words("hangman_text.txt").words[random]);
 	word_length = strlen(rand_word);
 
 	num_guesses = MIN(word_length + 10, 26);
@@ -584,8 +581,8 @@ void play_hangman(int client_socket, char credential[]) {
         	}
     	}
 
-    	printf("%s\n", word);
-    	printf("%s\n", guessed_letters);  
+    	// printf("%s\n", word);
+    	// printf("%s\n", guessed_letters);  
 
     	found = strchr(word, '_');
     	if (found) {
@@ -652,8 +649,6 @@ void leaderboard(int client_socket) {
 		strcat(leaderboard_data, "\n\nThere is no information currently stored in the Leader Board.\n");
 		strcat(leaderboard_data, "Try again later.\n\n");
 	}
-
-	// printf("%s\n", leaderboard_data);
 
 	send_string(client_socket, leaderboard_data);
 	clear_buffer(leaderboard_data);

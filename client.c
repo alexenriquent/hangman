@@ -22,6 +22,7 @@ int menu();
 bool logon(int socket, char credential[]);
 void play(int socket, char credential[]);
 void leaderboard(int socket);
+void clear_screen();
 
 /* 
  * main function 
@@ -62,6 +63,7 @@ int main(int argc, char** argv) {
 	puts("Connected\n");
 
 	/* keep communicating with server */
+	clear_screen();
 	welcome();
 
 	if (logon(socket_desc, credential)) {
@@ -215,7 +217,7 @@ bool logon(int socket, char credential[]) {
 	char password[PASSWORD_LENGTH];
 	bool valid;
 
-	printf("\n\nYou are required to logon with");
+	printf("\n\nYou are required to logon with ");
 	printf("your registered username and password\n");
 
 	printf("\nPlease enter your username: ");
@@ -252,6 +254,10 @@ void play(int socket, char credential[]) {
 	char* found;
 
 	num_guesses = receive_int(socket);
+	
+	for (int i = 0; i < 80; i++) {
+		word[i] = ' ';
+	}
 
 	while (sig != 1 && num_guesses > 0) {
 		printf("\nGuessed letters: %s\n\n", guessed_letters);
@@ -293,4 +299,14 @@ void leaderboard(int socket) {
 	receive_string(socket, leaderboard_data);
 	printf("%s\n", leaderboard_data);
 	clear_buffer(leaderboard_data);
+}
+
+/*
+ * function clear_screen(): clear the console terminal screen.
+ * algorithm: clear the console terminal screen.
+ * input:     none.
+ * output:    none.
+ */
+void clear_screen() {
+	system("clear");
 }
