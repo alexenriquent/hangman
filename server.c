@@ -9,6 +9,7 @@
 #include <arpa/inet.h>	/* inet_addr */
 #include <signal.h>
 #include <errno.h>
+#include <ctype.h>
 
 #define DEFAULT_PORT 12345		/* default port */
 #define NUM_HANDLER_THREADS 10	/* number of threads */
@@ -68,6 +69,7 @@ int get_num_games_played(char credential[]);
 void increment_num_games_won(char credential[]);
 void increment_num_games_played(char credential[]);
 bool statistic_available();
+void lowercase(char word[]);
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -82,6 +84,8 @@ struct request* last_request = NULL;	/* pointer to the last request */
 
 struct user users[NUM_USERS];			/* user records */
 
+int socket_desc;						/* socket descriptor */
+
 /* 
  * main function 
  */
@@ -89,12 +93,13 @@ int main(int argc, char** argv) {
 
 	system("clear");
 
-	int socket_desc, client_sock, c;
+	int client_sock, c;
 	struct sockaddr_in server, client;
 
 	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs */
 	pthread_t p_threads[NUM_HANDLER_THREADS];	/* thread's structures */
 
+	/* SIGINT handler */
 	signal(SIGINT, sigint_handler);
 
 	/* create socket */
@@ -259,7 +264,6 @@ void handle_request(struct request* a_request, int thread_id) {
     if (a_request) {
       	printf("Thread '%d' handled request of socket '%d'\n",
             	thread_id, a_request->socket);
-      	printf("Current number of requests: %d\n", num_requests);
       	fflush(stdout);
     }
 
@@ -331,6 +335,7 @@ void* handle_requests_loop(void* data) {
  */
 void sigint_handler(int sig) {
 	puts("SIGINT\n");
+	close(socket_desc);
 	exit(sig);
 }
 
@@ -599,6 +604,7 @@ void play_hangman(int client_socket, char credential[]) {
     		if (strcmp(letter, "") == 0) {
     			break;
     		}
+    		lowercase(letter);
     		strcat(guessed_letters, letter);
     		clear_buffer(letter); 
     		num_guesses--;
@@ -772,4 +778,18 @@ bool statistic_available() {
 		}
 	}
 	return false;
+}
+
+/*
+ * function lowercase(): covert a string to lowercase.
+ * algorithm: convert each character in a string to lowercase.
+ * input:     word.
+ * output:    none.
+ */
+void lowercase(char word[]) {
+	char result[DATA_LENGTH];
+	for (int i = 0; i < strlen(word); i++) {
+		result[i] = tolower(word[i]);
+	}
+	strcpy(word, result);
 }
