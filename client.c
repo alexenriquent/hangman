@@ -75,15 +75,18 @@ int main(int argc, char** argv) {
 	welcome();
 
 	if (logon(socket_desc, credential)) {
+		clear_screen();
+		welcome();
 		do {
-			welcome();
 			option = menu();
 			send_int(socket_desc, option);
 			switch(option) {
 				case 1:
+					clear_screen();
 					play(socket_desc, credential);
 					break;
 				case 2:
+					clear_screen();
 					leaderboard(socket_desc);
 					break;
 			}
@@ -148,13 +151,20 @@ void send_int(int socket, int integer) {
  * output:    none.
  */
 void receive_string(int socket, char buffer[]) {
+	int read_size;
+
 	while (1) {
-		if (recv(socket, buffer, DATA_LENGTH, 0) < 0) {
+		if ((read_size = recv(socket, buffer, DATA_LENGTH - 1, 0)) < 0) {
 			puts("recv failed");
 			break;
 		} else {
 			break;
 		}
+	}
+
+	/* put the null teminator at the end of the string */
+	if (read_size > 0) {
+		buffer[read_size] = '\0';
 	}
 }
 
@@ -203,10 +213,16 @@ void welcome() {
 	printf("===========================================\n");
 }
 
+/*
+ * function menu(): main menu.
+ * algorithm: display the main menu.
+ * input:     none.
+ * output:    selected option.
+ */
 int menu() {
 	int opt, temp, status;
 
-	printf("\n\nPlease enter a selection\n");
+	printf("\nPlease enter a selection\n");
 	printf("(1) Play Hangman\n");
 	printf("(2) Show Leaderboard\n");
 	printf("(3) Quit\n\n");
@@ -275,17 +291,13 @@ void play(int socket, char credential[]) {
 	char* found;
 
 	num_guesses = receive_int(socket);
-	
-	for (int i = 0; i < 80; i++) {
-		word[i] = ' ';
-	}
 
 	while (sig != 1 && num_guesses > 0) {
 		printf("\nGuessed letters: %s\n\n", guessed_letters);
 		printf("Number of guesses left: %d\n\n", num_guesses);
 		sig = receive_int(socket);
 		receive_string(socket, word);
-		printf("Word: %s\n", word);
+		printf("Word: %s\n\n", word);
 		if (sig != 1) {
 			printf("Enter your guess: ");
         	scanf("%s", letter);

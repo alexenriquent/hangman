@@ -156,7 +156,6 @@ int main(int argc, char** argv) {
 	while (client_sock = accept(socket_desc,
 		(struct sockaddr *)&client, (socklen_t*)&c)) {
 		puts("Connection accepted");
-
 		add_request(client_sock, &request_mutex, &got_request);
 	}
 
@@ -377,13 +376,20 @@ void send_int(int client_socket, int integer) {
  * output:    none.
  */
 void receive_string(int client_socket, char buffer[]) {
+	int read_size;
+
 	while (1) {
-		if (recv(client_socket, buffer, DATA_LENGTH, 0) < 0) {
+		if ((read_size = recv(client_socket, buffer, DATA_LENGTH - 1, 0)) < 0) {
 			puts("recv failed");
 			break;
 		} else {
 			break;
 		}
+	}
+
+	/* put the null teminator at the end of the string */
+	if (read_size > 0) {
+		buffer[read_size] = '\0';
 	}
 }
 
@@ -564,7 +570,8 @@ void play_hangman(int client_socket, char credential[]) {
 	send_int(client_socket, num_guesses);
 
 	while (sig != 1 && num_guesses > 0) {
-        word[0] = '\0';
+		clear_buffer(word);
+        // word[0] = '\0';
 		for (int i = 0; i < word_length; i++) {
         	bool flag = false;
         	for (int j = 0; j < strlen(guessed_letters); j++) {
