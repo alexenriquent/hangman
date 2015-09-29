@@ -70,6 +70,7 @@ void increment_num_games_won(char credential[]);
 void increment_num_games_played(char credential[]);
 bool statistic_available();
 void lowercase(char word[]);
+void clear_screen();
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -91,13 +92,13 @@ int socket_desc;						/* socket descriptor */
  */
 int main(int argc, char** argv) {
 
-	system("clear");
-
 	int client_sock, c;
 	struct sockaddr_in server, client;
 
 	int thr_id[NUM_HANDLER_THREADS];			/* thread IDs */
 	pthread_t p_threads[NUM_HANDLER_THREADS];	/* thread's structures */
+
+	clear_screen();
 
 	/* SIGINT handler */
 	signal(SIGINT, sigint_handler);
@@ -799,4 +800,14 @@ void lowercase(char word[]) {
 		result[i] = tolower(word[i]);
 	}
 	strcpy(word, result);
+}
+
+/*
+ * function clear_screen(): clear the console terminal screen.
+ * algorithm: clear the console terminal screen.
+ * input:     none.
+ * output:    none.
+ */
+void clear_screen() {
+	system("clear");
 }
