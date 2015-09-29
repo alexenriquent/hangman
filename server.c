@@ -22,6 +22,7 @@
 
 #define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
 
+/* typedef for struct comparison */
 typedef int (*compfn)(const void*, const void*);
 
 /* structure of a single request */
@@ -50,7 +51,6 @@ void add_request(int client_socket,
 struct request* get_request(pthread_mutex_t* p_mutex);
 void handle_request(struct request* a_request, int thread_id);
 void* handle_requests_loop(void* data);
-
 void sigint_handler(int sig);
 void send_string(int client_socket, char buffer[]);
 void send_int(int client_socket, int integer);
