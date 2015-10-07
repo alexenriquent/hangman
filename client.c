@@ -12,6 +12,7 @@
 #define PASSWORD_LENGTH 16		/* maximum word length for password */
 #define WORD_LENGTH 16			/* maximum word length */
 #define DATA_LENGTH	2048		/* general data length */
+#define CLIENT_NO 10
 
 /* function prototypes */
 void sigint_handler(int sig);
@@ -28,7 +29,7 @@ void leaderboard(int socket);
 void clear_screen();
 
 int socket_desc;	/* socket descriptor */
-
+char  verify_username[1024]="no name"; /*Username for logout verification*/
 /* 
  * main function 
  */
@@ -36,7 +37,7 @@ int main(int argc, char** argv) {
 
 	int read_size;
 	struct sockaddr_in server;
-	int option;
+	int option,socket_no;
 	char credential[DATA_LENGTH];
 
 	/* SIGINT handler */
@@ -68,7 +69,18 @@ int main(int argc, char** argv) {
 		perror("connect");
 		exit(1);
 	}
-	puts("Connected\n");
+	
+	/* check thread*/
+	socket_no =receive_int(socket_desc);
+	printf("Current Total Thread=%d\n",socket_no-1);
+	if(socket_no>CLIENT_NO){
+		fprintf(stderr,"Socket full.Please wait and connect again\n\n");
+		exit(1);
+	}
+			
+	puts("Socket created");
+	puts("Connected\n");		
+		
 
 	/* keep communicating with server */
 	clear_screen();
@@ -91,6 +103,8 @@ int main(int argc, char** argv) {
 					break;
 			}
 		} while (option != 3);
+		printf("\nget= %s\n",verify_username);
+		send_string(socket_desc,verify_username);
 	} else {
 		printf("\nYou entered either an incorrect username or password - disconnecting\n");
 	}
@@ -259,7 +273,18 @@ bool logon(int socket, char credential[]) {
 
 	printf("\nPlease enter your username: ");
 	scanf("%s", username);
+	strcpy(verify_username,username);
 	send_string(socket, username);
+	
+	server_signal = receive_int(socket);
+	while(server_signal==0){
+		printf("\n\nCurrent username already login in other client.");
+		printf("\nPlease enter other username: ");
+		scanf("%s", username);
+		send_string(socket, username);
+		server_signal = receive_int(socket);
+			
+	}
 	strcpy(credential, username);
 
 	printf("Please enter your password: ");

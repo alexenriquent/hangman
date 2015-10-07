@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <ctype.h>
 
-#define DEFAULT_PORT 12345		/* default port */
+#define DEFAULT_PORT 12346		/* default port */
 #define NUM_HANDLER_THREADS 10	/* number of threads */
 #define MAX_NUM_WORDS 2048		/* maximum number of words */
 #define MAX_WORD_LENGTH 256		/* maximum word length */
@@ -24,7 +24,7 @@
 
 /* typedef for struct comparison */
 typedef int (*compfn)(const void*, const void*);
-
+int login_status;
 /* structure of a single request */
 struct request {
 	int socket;					/* socket descriptor */
@@ -37,6 +37,7 @@ struct user {
 	char password[PASSWORD_LENGTH];		/* password */
 	int num_games_won;					/* number of games won */
 	int num_games_played;				/* number of games played */
+	int login_status;			/*user login status*/
 };
 
 /* structure of data read from file */
@@ -71,6 +72,8 @@ void increment_num_games_played(char credential[]);
 bool statistic_available();
 void lowercase(char word[]);
 void clear_screen();
+bool verify_user(char username[]);
+void logout_verified(int client_socket);
 
 /* global mutex */
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -79,7 +82,7 @@ pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER;
 
 int num_requests = 0; /* number of pending request, initially none */
-
+int total_socket =1;
 struct request* requests = NULL;		/* head of linked list of requests */
 struct request* last_request = NULL;	/* pointer to the last request */
 
@@ -122,7 +125,7 @@ int main(int argc, char** argv) {
 		printf("Listening on port %d\n", atoi(argv[1]));
 	} else if (argc == 1) {
 		server.sin_port = htons(DEFAULT_PORT);
-		printf("Listening on port 12345\n");
+		printf("Listening on port %d\n",DEFAULT_PORT);
 	} else {
 		fprintf(stderr, "usage: port number\n");
 		exit(1);
@@ -156,8 +159,14 @@ int main(int argc, char** argv) {
 	/* accept connection from an incomming client */
 	while (client_sock = accept(socket_desc,
 		(struct sockaddr *)&client, (socklen_t*)&c)) {
-		puts("Connection accepted");
-		add_request(client_sock, &request_mutex, &got_request);
+			
+			send_int(client_sock,total_socket);
+			
+			if(total_socket<=NUM_HANDLER_THREADS){
+				puts("Connection accepted");
+				add_request(client_sock, &request_mutex, &got_request);
+				total_socket++;
+			}
 	}
 
 	if (client_sock < 0) {
@@ -260,7 +269,7 @@ struct request* get_request(pthread_mutex_t* p_mutex) {
 void handle_request(struct request* a_request, int thread_id) {
     int client_signal;
     char credential[MAX_WORD_LENGTH];
-
+    
     if (a_request) {
       	printf("Thread '%d' handled request of socket '%d'\n",
             	thread_id, a_request->socket);
@@ -281,6 +290,8 @@ void handle_request(struct request* a_request, int thread_id) {
 					break;
 			}
     	} while (client_signal != 3);
+	
+	logout_verified(a_request->socket);
     }
 }
 
@@ -501,6 +512,7 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
     		separater++;
     		token = strtok(NULL, " \t");
     	}
+	users[i].login_status=0;
     }
 }
 
@@ -519,17 +531,39 @@ bool authenticate(int client_socket, char credential[]) {
 	char client_username[DATA_LENGTH];
 	char client_password[DATA_LENGTH];
 	bool valid;
+/*
+	for (int i = 0; i < NUM_USERS; i++) {
+    	printf("username %d: %s\t", i, users[i].username);
+    	printf("password %d: %s\t", i, users[i].password);
+	printf("login status %d: %d\n", i, users[i].login_status);
+    	}
+    
+	*/
 
-    receive_string(client_socket, client_username);
+
+	//Check client login status
+	receive_string(client_socket, client_username);
+	while(verify_user(client_username)==false){
+		printf("Username: %s, already exist\n", client_username);
+		clear_buffer(client_username);
+		response=0;
+		send_int(client_socket, response);
+		receive_string(client_socket, client_username); 
+	}
+	printf("%s\n", client_username);	
+	response=1;
+	send_int(client_socket, response);
+
 	receive_string(client_socket, client_password);
 	strcpy(credential, client_username);
-	printf("%s\n", client_username);
 	printf("%s\n", client_password);
+		
 
 	for (int i = 0; i < NUM_USERS; i++) {
 		if (strcmp(client_username, users[i].username) == 0 &&
 			strcmp(client_password, users[i].password) == 0) {
 			valid = true;
+			users[i].login_status=1;
 			break;
 		} else {
 			valid = false;
@@ -547,6 +581,26 @@ bool authenticate(int client_socket, char credential[]) {
 
 	return valid;
 }
+
+/*
+ * function verify_user(): Check duplicate login.
+ * algorithm: compare current_user with login status in user list.
+ *	      if already login, return false, otherwise, return true
+ * input:     client username
+ * output:    true if the client is successfully login_status=false,
+ 			  false otherwise.
+ */
+bool verify_user(char username[]){
+	for(int i=0;i<NUM_USERS;i++){
+		if(strcmp(username, users[i].username) == 0&&
+  			users[i].login_status==1){
+			return false;
+			break;
+		}	
+	}
+	return true;
+}
+
 
 /*
  * function play_hangman(): play the game of Hangman.
@@ -811,3 +865,29 @@ void lowercase(char word[]) {
 void clear_screen() {
 	system("clear");
 }
+
+/*
+ * function logout_verified(): Verify then update user logout status
+ * algorithm: Verify and update user_status and available socket number.
+ * input:     client socket.
+ * output:    none.
+ */
+void logout_verified(int client_socket){
+ 	
+	char client_username[DATA_LENGTH]="notget";
+	
+	total_socket--;
+
+	receive_string(client_socket, client_username);
+	
+	for (int i = 0; i < NUM_USERS; i++) {
+		if (strcmp(client_username, users[i].username) == 0) {
+			
+			users[i].login_status=0;
+			break;
+		} 
+	}
+
+
+}
+
