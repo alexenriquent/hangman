@@ -714,8 +714,9 @@ void leaderboard(int client_socket) {
 	}
 
 	if (strcmp(leaderboard_data, " ") == 0) {
-		strcat(leaderboard_data, "\n\nThere is no information currently stored in the Leader Board.\n");
-		strcat(leaderboard_data, "Try again later.\n\n");
+		strcat(leaderboard_data, "\n=============================================================\n\n");		
+	strcat(leaderboard_data, "There is no information currently stored in the Leader Board.\nTry again later.");
+	strcat(leaderboard_data, "\n\n=============================================================\n");
 	}
 
 	send_string(client_socket, leaderboard_data);
