@@ -1,35 +1,36 @@
-#include <stdio.h>		/* standard I/O routines */
-#include <stdlib.h>
-#include <stdbool.h> 	/* boolean */
-#include <unistd.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>	/* inet_addr */
-#include <signal.h>
-#include <ctype.h>
+#include "client.h"
+// #include <stdio.h>		/* standard I/O routines */
+// #include <stdlib.h>
+// #include <stdbool.h> 	/* boolean */
+// #include <unistd.h>
+// #include <string.h>
+// #include <sys/socket.h>
+// #include <arpa/inet.h>	/* inet_addr */
+// #include <signal.h>
+// #include <ctype.h>
 
-#define USERNAME_LENGTH 16		/* maximum word length for username */
-#define PASSWORD_LENGTH 16		/* maximum word length for password */
-#define WORD_LENGTH 16			/* maximum word length */
-#define DATA_LENGTH	2048		/* general data length */
-#define CLIENT_NO 10
+// #define USERNAME_LENGTH 16		/* maximum word length for username */
+// #define PASSWORD_LENGTH 16		/* maximum word length for password */
+// #define WORD_LENGTH 16			/* maximum word length */
+// #define DATA_LENGTH	2048		/* general data length */
+// #define CLIENT_NO 10			/* number of clients */
 
-/* function prototypes */
-void sigint_handler(int sig);
-void send_string(int socket, char buffer[]);
-void send_int(int socket, int integer);
-void receive_string(int socket, char buffer[]);
-int receive_int(int socket);
-void clear_buffer(char buffer[]);
-void welcome();
-int menu();
-bool logon(int socket, char credential[]);
-void play(int socket, char credential[]);
-void leaderboard(int socket);
-void clear_screen();
+// /* function prototypes */
+// void sigint_handler(int sig);
+// void send_string(int socket, char buffer[]);
+// void send_int(int socket, int integer);
+// void receive_string(int socket, char buffer[]);
+// int receive_int(int socket);
+// void clear_buffer(char buffer[]);
+// void welcome();
+// int menu();
+// bool logon(int socket, char credential[]);
+// void play(int socket, char credential[]);
+// void leaderboard(int socket);
+// void clear_screen();
 
 int socket_desc;	/* socket descriptor */
-char  verify_username[1024]="no name"; /*Username for logout verification*/
+char  verify_username[1024] = "no name"; /*Username for logout verification*/
 /* 
  * main function 
  */
@@ -74,7 +75,7 @@ int main(int argc, char** argv) {
 	socket_no =receive_int(socket_desc);
 	printf("Current Total Thread=%d\n",socket_no-1);
 	if(socket_no>CLIENT_NO){
-		fprintf(stderr,"Socket full.Please wait and connect again\n\n");
+		fprintf(stderr,"Socket full. Please wait and connect again\n\n");
 		exit(1);
 	}
 			
@@ -103,7 +104,6 @@ int main(int argc, char** argv) {
 					break;
 			}
 		} while (option != 3);
-		printf("\nget= %s\n",verify_username);
 		send_string(socket_desc,verify_username);
 	} else {
 		printf("\nYou entered either an incorrect username or password - disconnecting\n");
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
  * output:    none.
  */
 void sigint_handler(int sig) {
-	puts("SIGINT\n");
+	puts("Exit the program.");
 	close(socket_desc);
 	exit(sig);
 }
@@ -278,8 +278,8 @@ bool logon(int socket, char credential[]) {
 	
 	server_signal = receive_int(socket);
 	while(server_signal==0){
-		printf("\n\nCurrent username already login in other client.");
-		printf("\nPlease enter other username: ");
+		printf("\n\nThe current user is already online.");
+		printf("\nPlease login with other username: ");
 		scanf("%s", username);
 		send_string(socket, username);
 		server_signal = receive_int(socket);
