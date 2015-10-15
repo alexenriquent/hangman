@@ -15,7 +15,7 @@
 #define PASSWORD_LENGTH 16		/* maximum word length for password */
 #define WORD_LENGTH 16			/* maximum word length */
 #define DATA_LENGTH	2048		/* general data length */
-#define CLIENT_NO 10			/* number of clients */
+#define CLIENT_NO 10			/* maximum snumber of clients */
 
 /* function prototypes */
 void sigint_handler(int sig);

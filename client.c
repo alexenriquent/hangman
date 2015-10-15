@@ -1,7 +1,7 @@
 #include "client.h"
 
 int socket_desc;	/* socket descriptor */
-char  verify_username[1024] = "no name"; /*Username for logout verification*/
+
 /* 
  * main function 
  */
@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
 
 	int read_size;
 	struct sockaddr_in server;
-	int option,socket_no;
+	int option, socket_no;
 	char credential[DATA_LENGTH];
 
 	/* SIGINT handler */
@@ -28,7 +28,6 @@ int main(int argc, char** argv) {
 		perror("socket");
 		exit(1);
 	}
-	puts("Socket created");
 
 	/* configuring end point */
 	server.sin_addr.s_addr = inet_addr(argv[1]);
@@ -41,18 +40,14 @@ int main(int argc, char** argv) {
 		perror("connect");
 		exit(1);
 	}
-	
-	/* check thread*/
-	socket_no =receive_int(socket_desc);
-	printf("Current Total Thread=%d\n",socket_no-1);
-	if(socket_no>CLIENT_NO){
-		fprintf(stderr,"Socket full. Please wait and connect again\n\n");
+
+	/* check thread */
+	socket_no = receive_int(socket_desc);
+
+	if (socket_no > CLIENT_NO){
+		fprintf(stderr,"Socket full. Please wait and connect again.\n\n");
 		exit(1);
 	}
-			
-	puts("Socket created");
-	puts("Connected\n");		
-		
 
 	/* keep communicating with server */
 	clear_screen();
@@ -75,7 +70,6 @@ int main(int argc, char** argv) {
 					break;
 			}
 		} while (option != 3);
-		send_string(socket_desc,verify_username);
 	} else {
 		printf("\nYou entered either an incorrect username or password - disconnecting\n");
 	}
@@ -93,7 +87,7 @@ int main(int argc, char** argv) {
  * output:    none.
  */
 void sigint_handler(int sig) {
-	puts("Exit the program.");
+	puts("Exit the program\n");
 	close(socket_desc);
 	exit(sig);
 }
@@ -244,18 +238,7 @@ bool logon(int socket, char credential[]) {
 
 	printf("\nPlease enter your username: ");
 	scanf("%s", username);
-	strcpy(verify_username,username);
 	send_string(socket, username);
-	
-	server_signal = receive_int(socket);
-	while(server_signal==0){
-		printf("\n\nThe current user is already online.");
-		printf("\nPlease login with other username: ");
-		scanf("%s", username);
-		send_string(socket, username);
-		server_signal = receive_int(socket);
-			
-	}
 	strcpy(credential, username);
 
 	printf("Please enter your password: ");
@@ -310,6 +293,7 @@ void play(int socket, char credential[]) {
 	}
 
 	printf("Game over\n\n");
+
 	if (sig == 1) {
 		printf("Well done %s! You won this round of Hangman!\n\n", credential);
 	} else {

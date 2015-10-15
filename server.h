@@ -22,12 +22,13 @@
 #define PASSWORD_LENGTH 16		/* maximum word length for password */
 #define NUM_USERS 10			/* number of users */
 #define DATA_LENGTH	2048		/* general data length */
+#define BACKLOG 10				/* backlog */
 
 #define MIN(x, y) ((x) < (y) ? x : y) /* determin the minimum value */
 
 /* typedef for struct comparison */
 typedef int (*compfn)(const void*, const void*);
-int login_status;
+
 /* structure of a single request */
 struct request {
 	int socket;					/* socket descriptor */
@@ -40,7 +41,6 @@ struct user {
 	char password[PASSWORD_LENGTH];		/* password */
 	int num_games_won;					/* number of games won */
 	int num_games_played;				/* number of games played */
-	int login_status;					/*user login status*/
 };
 
 /* structure of data read from file */
@@ -75,7 +75,5 @@ void increment_num_games_played(char credential[]);
 bool statistic_available();
 void lowercase(char word[]);
 void clear_screen();
-bool verify_user(char username[]);
-void logout_verified(int client_socket);
 
 #endif 

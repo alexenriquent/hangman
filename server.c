@@ -6,8 +6,9 @@ pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 /* global condition variable */
 pthread_cond_t  got_request   = PTHREAD_COND_INITIALIZER;
 
-int num_requests = 0; /* number of pending request, initially none */
-int total_socket =1;
+int num_requests = 0; /* number of pending request */
+int total_socket = 1; /* total number of sockets */
+
 struct request* requests = NULL;		/* head of linked list of requests */
 struct request* last_request = NULL;	/* pointer to the last request */
 
@@ -23,7 +24,7 @@ int main(int argc, char** argv) {
 	int client_sock, c;
 	struct sockaddr_in server, client;
 
-	int thr_id[NUM_HANDLER_THREADS];	
+	int thr_id[NUM_HANDLER_THREADS];			
 	pthread_t p_threads[NUM_HANDLER_THREADS];	
 
 	clear_screen();
@@ -49,7 +50,7 @@ int main(int argc, char** argv) {
 		printf("Listening on port %d\n", atoi(argv[1]));
 	} else if (argc == 1) {
 		server.sin_port = htons(DEFAULT_PORT);
-		printf("Listening on port %d\n",DEFAULT_PORT);
+		printf("Listening on port 12345\n");
 	} else {
 		fprintf(stderr, "usage: port number\n");
 		exit(1);
@@ -63,7 +64,7 @@ int main(int argc, char** argv) {
 	}
 
 	/* listen */
-	listen(socket_desc, 10);
+	listen(socket_desc, BACKLOG);
 
 	/* create threads */
 	for (int i = 0; i < NUM_HANDLER_THREADS; i++) {
@@ -76,19 +77,19 @@ int main(int argc, char** argv) {
 	tokenise_auth(read_file("Authentication.txt").words);
 
 	/* accept an incomming connection */
-	puts("Waiting for incomming connection...");
+	puts("Waiting for incomming connections...");
 	c = sizeof(struct sockaddr_in);
 
 	/* accept connection from an incomming client */
 	while (client_sock = accept(socket_desc,
-		(struct sockaddr *)&client, (socklen_t*)&c)) {
+		(struct sockaddr *)&client, (socklen_t*)&c)) {			
+		send_int(client_sock,total_socket);
+		printf("%d\n", total_socket);
 			
-			send_int(client_sock,total_socket);
-			
-			if(total_socket<=NUM_HANDLER_THREADS){
-				add_request(client_sock, &request_mutex, &got_request);
-				total_socket++;
-			}
+		if (total_socket <= NUM_HANDLER_THREADS){
+			add_request(client_sock, &request_mutex, &got_request);
+			total_socket++;
+		}
 	}
 
 	if (client_sock < 0) {
@@ -116,7 +117,7 @@ void add_request(int client_socket,
 
   	/* create structure with new request */
  	 a_request = (struct request*)malloc(sizeof(struct request));
-  	if (!a_request) { 
+  	if (!a_request) { /* malloc failed?? */
      	fprintf(stderr, "add_request: out of memory\n");
       	exit(1);
   	}
@@ -206,9 +207,8 @@ void handle_request(struct request* a_request, int thread_id) {
 					break;
 			}
     	} while (client_signal != 3);
-	
-	logout_verified(a_request->socket);
     }
+    total_socket--;
 }
 
 /*
@@ -261,7 +261,7 @@ void* handle_requests_loop(void* data) {
  * output:    none.
  */
 void sigint_handler(int sig) {
-	puts("Exit the program.");
+	puts("Exit the program\n");
 	close(socket_desc);
 	exit(sig);
 }
@@ -428,7 +428,6 @@ void tokenise_auth(char word_list[][MAX_WORD_LENGTH]) {
     		separater++;
     		token = strtok(NULL, " \t");
     	}
-	users[i].login_status=0;
     }
 }
 
@@ -448,25 +447,14 @@ bool authenticate(int client_socket, char credential[]) {
 	char client_password[DATA_LENGTH];
 	bool valid;
 
-	/* Check client login status */
-	receive_string(client_socket, client_username);
-	while (verify_user(client_username)==false) {
-		clear_buffer(client_username);
-		response = 0;
-		send_int(client_socket, response);
-		receive_string(client_socket, client_username); 
-	}
-
-	response = 1;
-	send_int(client_socket, response);
+    receive_string(client_socket, client_username);
 	receive_string(client_socket, client_password);
-	strcpy(credential, client_username);		
+	strcpy(credential, client_username);
 
 	for (int i = 0; i < NUM_USERS; i++) {
 		if (strcmp(client_username, users[i].username) == 0 &&
 			strcmp(client_password, users[i].password) == 0) {
 			valid = true;
-			users[i].login_status=1;
 			break;
 		} else {
 			valid = false;
@@ -484,26 +472,6 @@ bool authenticate(int client_socket, char credential[]) {
 
 	return valid;
 }
-
-/*
- * function verify_user(): Check duplicate login.
- * algorithm: compare current_user with login status in user list.
- *	      if already login, return false, otherwise, return true
- * input:     client username
- * output:    true if the client is successfully login_status=false,
- 			  false otherwise.
- */
-bool verify_user(char username[]){
-	for (int i = 0; i < NUM_USERS; i++) {
-		if (strcmp(username, users[i].username) == 0 &&
-  			users[i].login_status == 1) {
-			return false;
-			break;
-		}	
-	}
-	return true;
-}
-
 
 /*
  * function play_hangman(): play the game of Hangman.
@@ -613,9 +581,9 @@ void leaderboard(int client_socket) {
 	}
 
 	if (strcmp(leaderboard_data, " ") == 0) {
-		strcat(leaderboard_data, "\n=============================================================\n\n");		
-	strcat(leaderboard_data, "There is no information currently stored in the Leader Board.\nTry again later.");
-	strcat(leaderboard_data, "\n\n=============================================================\n");
+		strcat(leaderboard_data, "\n=============================================================\n\n");
+		strcat(leaderboard_data, "There is no information currently stored in the Leader Board.\nTry again later.");
+		strcat(leaderboard_data, "\n\n=============================================================\n");
 	}
 
 	send_string(client_socket, leaderboard_data);
@@ -765,27 +733,3 @@ void lowercase(char word[]) {
 void clear_screen() {
 	system("clear");
 }
-
-/*
- * function logout_verified(): Verify then update user logout status
- * algorithm: Verify and update user_status and available socket number.
- * input:     client socket.
- * output:    none.
- */
-void logout_verified(int client_socket){
- 	
-	char client_username[DATA_LENGTH] = "notget";
-	
-	total_socket--;
-
-	receive_string(client_socket, client_username);
-	
-	for (int i = 0; i < NUM_USERS; i++) {
-		if (strcmp(client_username, users[i].username) == 0) {
-			
-			users[i].login_status=0;
-			break;
-		} 
-	}
-}
-
